@@ -35,6 +35,7 @@ export type {
   InitEventData,
   ToolUseEventData,
   ToolResultEventData,
+  ToolOutputEventData,
   TextEventData,
   ThinkingEventData,
   ResultEventData,

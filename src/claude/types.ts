@@ -27,6 +27,11 @@ export interface ToolResultEventData {
   isError: boolean;
 }
 
+export interface ToolOutputEventData {
+  tool: string;
+  output: string;
+}
+
 export interface TextEventData {
   text: string;
 }
@@ -51,6 +56,7 @@ export type StreamEvent =
   | { type: 'init'; data: InitEventData }
   | { type: 'tool_use'; data: ToolUseEventData }
   | { type: 'tool_result'; data: ToolResultEventData }
+  | { type: 'tool_output'; data: ToolOutputEventData }
   | { type: 'text'; data: TextEventData }
   | { type: 'thinking'; data: ThinkingEventData }
   | { type: 'result'; data: ResultEventData }

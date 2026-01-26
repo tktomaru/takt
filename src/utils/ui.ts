@@ -151,6 +151,9 @@ export function truncate(text: string, maxLength: number): string {
 /** Stream display manager for real-time Claude output */
 export class StreamDisplay {
   private lastToolUse: string | null = null;
+  private currentToolInputPreview: string | null = null;
+  private toolOutputBuffer = '';
+  private toolOutputPrinted = false;
   private textBuffer = '';
   private thinkingBuffer = '';
   private isFirstText = true;
@@ -206,12 +209,42 @@ export class StreamDisplay {
     // Start spinner to show tool is executing
     this.startToolSpinner(tool, inputPreview);
     this.lastToolUse = tool;
+    this.currentToolInputPreview = inputPreview;
+    this.toolOutputBuffer = '';
+    this.toolOutputPrinted = false;
+  }
+
+  /** Display tool output streaming */
+  showToolOutput(output: string, tool?: string): void {
+    if (!output) return;
+    this.stopToolSpinner();
+    this.flushThinking();
+    this.flushText();
+
+    if (tool && !this.lastToolUse) {
+      this.lastToolUse = tool;
+    }
+
+    this.toolOutputBuffer += output;
+    const lines = this.toolOutputBuffer.split(/\r?\n/);
+    this.toolOutputBuffer = lines.pop() ?? '';
+
+    this.printToolOutputLines(lines, tool);
+
+    if (this.lastToolUse && this.currentToolInputPreview) {
+      this.startToolSpinner(this.lastToolUse, this.currentToolInputPreview);
+    }
   }
 
   /** Display tool result event */
   showToolResult(content: string, isError: boolean): void {
     // Stop the spinner first
     this.stopToolSpinner();
+
+    if (this.toolOutputBuffer) {
+      this.printToolOutputLines([this.toolOutputBuffer], this.lastToolUse ?? undefined);
+      this.toolOutputBuffer = '';
+    }
 
     const toolName = this.lastToolUse || 'Tool';
     if (isError) {
@@ -225,6 +258,8 @@ export class StreamDisplay {
       console.log(chalk.green(`  ✓ ${toolName}`));
     }
     this.lastToolUse = null;
+    this.currentToolInputPreview = null;
+    this.toolOutputPrinted = false;
   }
 
   /** Display streaming thinking (Claude's internal reasoning) */
@@ -308,6 +343,9 @@ export class StreamDisplay {
   reset(): void {
     this.stopToolSpinner();
     this.lastToolUse = null;
+    this.currentToolInputPreview = null;
+    this.toolOutputBuffer = '';
+    this.toolOutputPrinted = false;
     this.textBuffer = '';
     this.thinkingBuffer = '';
     this.isFirstText = true;
@@ -329,6 +367,9 @@ export class StreamDisplay {
           break;
         case 'tool_result':
           this.showToolResult(event.data.content, event.data.isError);
+          break;
+        case 'tool_output':
+          this.showToolOutput(event.data.output, event.data.tool);
           break;
         case 'text':
           this.showText(event.data.text);
@@ -370,6 +411,21 @@ export class StreamDisplay {
         }
         return '';
       }
+    }
+  }
+
+  private ensureToolOutputHeader(tool?: string): void {
+    if (this.toolOutputPrinted) return;
+    const label = tool || this.lastToolUse || 'Tool';
+    console.log(chalk.gray(`  ${chalk.yellow(label)} output:`));
+    this.toolOutputPrinted = true;
+  }
+
+  private printToolOutputLines(lines: string[], tool?: string): void {
+    if (lines.length === 0) return;
+    this.ensureToolOutputHeader(tool);
+    for (const line of lines) {
+      console.log(chalk.gray(`  │ ${line}`));
     }
   }
 }
