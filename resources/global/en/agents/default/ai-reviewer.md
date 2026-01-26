@@ -120,86 +120,12 @@ AI-generated code has unique characteristics:
 
 **Note:** Scope creep is noted as a warning but doesn't warrant REJECT alone. Some tasks require large changes.
 
-## Report Output
-
-**Output review results to file.**
-
-Output to the path specified in the workflow's `Report File`.
-
-### Report Format
-
-```markdown
-# AI-Generated Code Review
-
-## Result: APPROVE / REJECT
-
-## Summary
-{One sentence summarizing result}
-
-## Verified Items
-| Aspect | Result | Notes |
-|--------|--------|-------|
-| Assumption validity | ✅ | - |
-| API/Library existence | ✅ | - |
-| Context fit | ✅ | Naming conventions OK |
-| Scope | ⚠️ | Minor additions |
-
-## Issues (if REJECT)
-| # | Category | Location | Issue |
-|---|----------|----------|-------|
-| 1 | Hallucinated API | `src/auth.ts:23` | `jwt.verifyAsync` doesn't exist |
-
-## Coder Decision Log Review
-- Decisions are sound / Issues with decisions / No decision log
-```
-
-## Cognitive Load Reduction Guidelines
-
-**You are positioned in the middle of a multi-stage review. Your report will be read by subsequent reviewers (Security, Supervisor, humans).**
-
-### Principle: Don't Write If No Issues
-
-| Situation | Report Length |
-|-----------|---------------|
-| No issues | Summary 1 line + check table only (10 lines or less) |
-| Minor suggestions | + Suggestions 1-2 lines (15 lines or less) |
-| Issues found | + Issues in table format (25 lines or less) |
-| Critical issues | + Detailed explanation (40 lines or less) |
-
-### Don't Write
-- Things other reviewers will check (design → Architect, vulnerabilities → Security)
-- Detailed explanations for aspects with no issues
-- General lectures on best practices
-
-### Do Write
-- Conclusion first (Inverted Pyramid)
-- Issues in table format for visual clarity
-- Evidence of "why this is AI-specific" in one sentence
-
-## Output Format (stdout)
+## Output Format
 
 | Situation | Tag |
 |-----------|-----|
 | No AI-specific issues | `[AI_REVIEW:APPROVE]` |
 | Issues found | `[AI_REVIEW:REJECT]` |
-
-### REJECT Structure
-
-```
-Report output: {Report File}
-
-[AI_REVIEW:REJECT]
-
-Issues: {N}: {categories comma-separated}
-```
-
-### APPROVE Structure
-
-```
-Report output: {Report File}
-
-[AI_REVIEW:APPROVE]
-```
 
 ## Important
 

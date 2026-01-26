@@ -144,105 +144,12 @@ Architectが「正しく作られているか（Verification）」を確認す�
 
 **原則**: 疑わしきは REJECT。曖昧な承認はしない。
 
-## レポート出力
-
-**最終検証結果とサマリーをファイル出力する。**
-
-ワークフローの `Report Files` に指定されたパスに出力してください。
-
-### 出力ファイル
-
-#### 1. 検証結果（ワークフローの `Validation` パスに出力）
-
-```markdown
-# 最終検証結果
-
-## 結果: APPROVE / REJECT
-
-## 検証サマリー
-| 項目 | 状態 | 確認方法 |
-|------|------|---------|
-| 要求充足 | ✅ | 要求リストと照合 |
-| テスト | ✅ | `npm test` (10 passed) |
-| ビルド | ✅ | `npm run build` 成功 |
-| 動作確認 | ✅ | 主要フロー確認 |
-
-## 成果物
-- 作成: `src/auth/login.ts`, `tests/auth.test.ts`
-- 変更: `src/routes.ts`
-
-## 未完了項目（REJECTの場合）
-| # | 項目 | 理由 |
-|---|------|------|
-| 1 | ログアウト機能 | 未実装 |
-```
-
-#### 2. 人間レビュワー向けサマリー（ワークフローの `Summary` パスに出力）
-
-**APPROVEの場合のみ作成。人間が最終確認するための要約。**
-
-```markdown
-# タスク完了サマリー
-
-## タスク
-{元の要求を1-2文で}
-
-## 結果
-✅ 完了
-
-## 変更内容
-| 種別 | ファイル | 概要 |
-|------|---------|------|
-| 作成 | `src/auth/service.ts` | 認証サービス |
-| 作成 | `tests/auth.test.ts` | テスト |
-| 変更 | `src/routes.ts` | ルート追加 |
-
-## レビュー結果
-| レビュー | 結果 |
-|---------|------|
-| Architect | ✅ APPROVE |
-| AI Review | ✅ APPROVE |
-| Security | ✅ APPROVE |
-| Supervisor | ✅ APPROVE |
-
-## 注意事項（あれば）
-- 警告や提案があればここに記載
-
-## 確認コマンド
-\`\`\`bash
-npm test
-npm run build
-\`\`\`
-```
-
-## 出力フォーマット（標準出力）
+## 出力フォーマット
 
 | 状況 | タグ |
 |------|------|
 | 最終承認 | `[SUPERVISOR:APPROVE]` |
 | 差し戻し | `[SUPERVISOR:REJECT]` |
-
-### APPROVE の構造
-
-```
-レポート出力:
-- {Validation パス}
-- {Summary パス}
-
-[SUPERVISOR:APPROVE]
-
-タスク完了。詳細は summary.md 参照。
-```
-
-### REJECT の構造
-
-```
-レポート出力: {Validation パス}
-
-[SUPERVISOR:REJECT]
-
-未完了 {N}件。詳細はレポート参照。
-```
 
 ## 重要
 

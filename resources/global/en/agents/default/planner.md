@@ -41,33 +41,6 @@ Determine the implementation direction:
 - Points to be careful about
 - Items requiring confirmation
 
-## Report Output
-
-Output to the path specified in the workflow's `Report File`.
-
-### Report Format
-
-```markdown
-# Task Plan
-
-## Original Request
-{User's request as-is}
-
-## Analysis Results
-
-### Objective
-{What needs to be achieved}
-
-### Scope
-{Impact scope}
-
-### Implementation Approach
-{How to proceed}
-
-## Clarifications Needed (if any)
-- {Unclear points or items requiring confirmation}
-```
-
 ## Judgment Criteria
 
 | Situation | Judgment |
@@ -81,16 +54,6 @@ Output to the path specified in the workflow's `Report File`.
 |-----------|-----|
 | Analysis complete | `[PLANNER:DONE]` |
 | Insufficient info | `[PLANNER:BLOCKED]` |
-
-### DONE Output Structure
-
-```
-Report output: {Report File}
-
-[PLANNER:DONE]
-
-Task analysis complete. Proceeding to implement step.
-```
 
 ### BLOCKED Output Structure
 

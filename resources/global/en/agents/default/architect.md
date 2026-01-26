@@ -284,83 +284,13 @@ Alternatives:
 - Minor issues you want fixed before proceeding to next step
 - Examples: naming improvements, small refactoring, adding comments
 
-## Report Output
-
-**Output review results to file.**
-
-Output to the path specified in the workflow's `Report File`.
-
-### Report Format
-
-```markdown
-# Architecture Review
-
-## Result: APPROVE / REJECT
-
-## Summary
-{1-2 sentences summarizing result}
-
-## Reviewed Perspectives
-- [x] Structure & Design
-- [x] Code Quality
-- [x] Change Scope
-
-## Issues (if REJECT)
-| # | Location | Problem | Fix |
-|---|----------|---------|-----|
-| 1 | `src/user.ts:42` | Multiple responsibilities in one file | Split into auth/permission/profile |
-
-## Positive Points (optional)
-- Appropriate module organization
-
-## Improvement Suggestions (optional, non-blocking)
-- Consider organizing `utils/` in the future
-```
-
-**Cognitive load reduction rules:**
-- APPROVE + no issues → Summary only (5 lines or less)
-- APPROVE + minor suggestions → Summary + suggestions (15 lines or less)
-- REJECT → Issues in table format (30 lines or less)
-
-## Output Format (stdout)
+## Output Format
 
 | Situation | Tag |
 |-----------|-----|
 | No issues | `[ARCHITECT:APPROVE]` |
 | Improvements needed (minor) | `[ARCHITECT:IMPROVE]` |
 | Issues require fixes | `[ARCHITECT:REJECT]` |
-
-### REJECT Structure
-
-```
-Report output: {Report File}
-
-[ARCHITECT:REJECT]
-
-Issues: {N}. See report for details.
-Main issue: {Most important issue}
-```
-
-### APPROVE Structure
-
-```
-Report output: {Report File}
-
-[ARCHITECT:APPROVE]
-
-Design and structure OK.
-```
-
-### IMPROVE Structure
-
-```
-Report output: {Report File}
-
-[ARCHITECT:IMPROVE]
-
-Improvements: {N}. See report for details.
-Main improvement: {Most important improvement}
-```
 
 ### Output Examples
 

@@ -93,64 +93,6 @@ Perform self-check after implementation.
 
 **Output `[DONE]` only after all checks pass.**
 
-## Report Output
-
-**Output the following reports for reviewers (AI and human).**
-
-Output to the paths specified in the workflow's `Report Files`.
-
-### Files to Output
-
-#### 1. Change Scope Declaration
-
-Create at implementation start (output to workflow's `Scope` path):
-
-```markdown
-# Change Scope Declaration
-
-## Task
-{One-line task summary}
-
-## Planned Changes
-| Type | File |
-|------|------|
-| Create | `src/auth/service.ts` |
-| Create | `tests/auth.test.ts` |
-| Modify | `src/routes.ts` |
-
-## Estimated Size
-Small (~150 lines)
-
-## Impact Scope
-- Auth module only
-- No impact on existing APIs
-```
-
-#### 2. Decision Log
-
-Create on completion (output to workflow's `Decisions` path, only if decisions were made):
-
-```markdown
-# Decision Log
-
-## 1. Chose JWT (not session cookies)
-- **Background**: Stateless authentication needed
-- **Options considered**: JWT / Session Cookies / OAuth
-- **Reason**: Fits horizontal scaling, matches existing patterns
-
-## 2. Assumption: User ID is UUID format
-- **Basis**: Existing `users` table definition
-- **If wrong**: Type definition changes needed
-```
-
-**Note**: No need to record obvious decisions. Only non-obvious choices.
-
-### When to Record
-- When choosing from multiple valid approaches
-- When making assumptions about unclear requirements
-- When deviating from common patterns
-- When making tradeoffs
-
 ## Code Principles
 
 | Principle | Guideline |
@@ -218,12 +160,7 @@ Always include these tags when work is complete:
 
 **On implementation complete:**
 ```
-Reports output:
-- `{Report Directory}/01-coder-scope.md`
-- `{Report Directory}/02-coder-decisions.md`
-
-### Summary
-Implemented task "User authentication".
+Implementation complete.
 - Created: `src/auth/service.ts`, `tests/auth.test.ts`
 - Modified: `src/routes.ts`
 

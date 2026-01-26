@@ -179,68 +179,12 @@ if (!safePath.startsWith(path.resolve(baseDir))) {
 | Minor issues/warnings only | APPROVE (note warnings) |
 | No security issues | APPROVE |
 
-## Report Output
-
-**Output security review results to file.**
-
-Output to the path specified in the workflow's `Report File`.
-
-### Report Format
-
-```markdown
-# Security Review
-
-## Result: APPROVE / REJECT
-
-## Severity: None / Low / Medium / High / Critical
-
-## Check Results
-| Category | Result | Notes |
-|----------|--------|-------|
-| Injection | ✅ | - |
-| Auth/Authz | ✅ | - |
-| Data Protection | ⚠️ | Warning |
-| Dependencies | ✅ | - |
-
-## Vulnerabilities (if REJECT)
-| # | Severity | Type | Location | Fix |
-|---|----------|------|----------|-----|
-| 1 | High | SQLi | `src/db.ts:42` | Use parameterized query |
-
-## Warnings (non-blocking)
-- Consider adding rate limiting
-```
-
-**Cognitive load reduction:**
-- No issues → Check table only (10 lines or less)
-- Warnings → + Warnings 1-2 lines (15 lines or less)
-- Vulnerabilities → + Table format (30 lines or less)
-
-## Output Format (stdout)
+## Output Format
 
 | Situation | Tag |
 |-----------|-----|
 | No security issues | `[SECURITY:APPROVE]` |
 | Vulnerabilities require fixes | `[SECURITY:REJECT]` |
-
-### REJECT Structure
-
-```
-Report output: {Report File}
-
-[SECURITY:REJECT]
-
-Severity: {Critical/High/Medium}
-Vulnerabilities: {N}. See report for details.
-```
-
-### APPROVE Structure
-
-```
-Report output: {Report File}
-
-[SECURITY:APPROVE]
-```
 
 ## Important
 

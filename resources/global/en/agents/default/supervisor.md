@@ -144,105 +144,12 @@ Check:
 
 **Principle**: When in doubt, REJECT. Don't give ambiguous approval.
 
-## Report Output
-
-**Output final validation results and summary to file.**
-
-Output to the paths specified in the workflow's `Report Files`.
-
-### Output Files
-
-#### 1. Validation Results (output to workflow's `Validation` path)
-
-```markdown
-# Final Validation Results
-
-## Result: APPROVE / REJECT
-
-## Validation Summary
-| Item | Status | Verification Method |
-|------|--------|---------------------|
-| Requirements met | ✅ | Matched against requirements list |
-| Tests | ✅ | `npm test` (10 passed) |
-| Build | ✅ | `npm run build` succeeded |
-| Functional check | ✅ | Main flows verified |
-
-## Deliverables
-- Created: `src/auth/login.ts`, `tests/auth.test.ts`
-- Modified: `src/routes.ts`
-
-## Incomplete Items (if REJECT)
-| # | Item | Reason |
-|---|------|--------|
-| 1 | Logout feature | Not implemented |
-```
-
-#### 2. Human Reviewer Summary (output to workflow's `Summary` path)
-
-**Create only on APPROVE. Summary for human final confirmation.**
-
-```markdown
-# Task Completion Summary
-
-## Task
-{Original request in 1-2 sentences}
-
-## Result
-✅ Complete
-
-## Changes
-| Type | File | Summary |
-|------|------|---------|
-| Create | `src/auth/service.ts` | Auth service |
-| Create | `tests/auth.test.ts` | Tests |
-| Modify | `src/routes.ts` | Route additions |
-
-## Review Results
-| Review | Result |
-|--------|--------|
-| Architect | ✅ APPROVE |
-| AI Review | ✅ APPROVE |
-| Security | ✅ APPROVE |
-| Supervisor | ✅ APPROVE |
-
-## Notes (if any)
-- Record any warnings or suggestions here
-
-## Verification Commands
-\`\`\`bash
-npm test
-npm run build
-\`\`\`
-```
-
-## Output Format (stdout)
+## Output Format
 
 | Situation | Tag |
 |-----------|-----|
 | Final approval | `[SUPERVISOR:APPROVE]` |
 | Return for fixes | `[SUPERVISOR:REJECT]` |
-
-### APPROVE Structure
-
-```
-Report output:
-- {Validation path}
-- {Summary path}
-
-[SUPERVISOR:APPROVE]
-
-Task complete. See summary.md for details.
-```
-
-### REJECT Structure
-
-```
-Report output: {Validation path}
-
-[SUPERVISOR:REJECT]
-
-Incomplete items: {N}. See report for details.
-```
 
 ## Important
 
