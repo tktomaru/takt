@@ -33,6 +33,28 @@ export type {
 } from './types.js';
 export { COMPLETE_STEP, ABORT_STEP } from './constants.js';
 
+/**
+ * Generate report directory name from task and timestamp.
+ * Format: YYYYMMDD-HHMMSS-task-summary
+ */
+function generateReportDir(task: string): string {
+  const now = new Date();
+  const timestamp = now.toISOString()
+    .replace(/[-:T]/g, '')
+    .slice(0, 14)
+    .replace(/(\d{8})(\d{6})/, '$1-$2');
+
+  // Extract first 30 chars of task, sanitize for directory name
+  const summary = task
+    .slice(0, 30)
+    .toLowerCase()
+    .replace(/[^a-z0-9\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    || 'task';
+
+  return `${timestamp}-${summary}`;
+}
+
 /** Workflow engine for orchestrating agent execution */
 export class WorkflowEngine extends EventEmitter {
   private state: WorkflowState;
@@ -41,6 +63,7 @@ export class WorkflowEngine extends EventEmitter {
   private task: string;
   private options: WorkflowEngineOptions;
   private loopDetector: LoopDetector;
+  private reportDir: string;
 
   constructor(config: WorkflowConfig, cwd: string, task: string, options: WorkflowEngineOptions = {}) {
     super();
@@ -49,6 +72,7 @@ export class WorkflowEngine extends EventEmitter {
     this.task = task;
     this.options = options;
     this.loopDetector = new LoopDetector(config.loopDetection);
+    this.reportDir = generateReportDir(task);
     this.validateConfig();
     this.state = createInitialState(config, options);
   }
@@ -94,6 +118,7 @@ export class WorkflowEngine extends EventEmitter {
       cwd: this.cwd,
       userInputs: this.state.userInputs,
       previousOutput: getPreviousOutput(this.state),
+      reportDir: this.reportDir,
     });
   }
 

@@ -28,6 +28,7 @@ export const TransitionConditionSchema = z.enum([
   'blocked',
   'approved',
   'rejected',
+  'improve',
   'always',
 ]);
 
@@ -107,49 +108,19 @@ export const ProjectConfigSchema = z.object({
   agents: z.array(CustomAgentConfigSchema).optional(),
 });
 
-/** Status pattern for parsing agent output */
-export const DEFAULT_STATUS_PATTERNS: Record<string, Record<string, string>> = {
-  coder: {
-    done: '\\[CODER:(DONE|FIXED)\\]',
-    blocked: '\\[CODER:BLOCKED\\]',
-  },
-  architect: {
-    approved: '\\[ARCHITECT:APPROVE\\]',
-    rejected: '\\[ARCHITECT:REJECT\\]',
-  },
-  supervisor: {
-    approved: '\\[SUPERVISOR:APPROVE\\]',
-    rejected: '\\[SUPERVISOR:REJECT\\]',
-  },
-  security: {
-    approved: '\\[SECURITY:APPROVE\\]',
-    rejected: '\\[SECURITY:REJECT\\]',
-  },
-  // MAGI System agents
-  melchior: {
-    approved: '\\[MELCHIOR:APPROVE\\]',
-    rejected: '\\[MELCHIOR:REJECT\\]',
-  },
-  balthasar: {
-    approved: '\\[BALTHASAR:APPROVE\\]',
-    rejected: '\\[BALTHASAR:REJECT\\]',
-  },
-  casper: {
-    approved: '\\[MAGI:APPROVE\\]',
-    rejected: '\\[MAGI:REJECT\\]',
-  },
-  // Research workflow agents
-  planner: {
-    done: '\\[PLANNER:DONE\\]',
-    blocked: '\\[PLANNER:BLOCKED\\]',
-  },
-  digger: {
-    done: '\\[DIGGER:DONE\\]',
-    blocked: '\\[DIGGER:BLOCKED\\]',
-  },
-  // Research supervisor - uses same patterns as default supervisor
-  'research/supervisor': {
-    approved: '\\[SUPERVISOR:APPROVE\\]',
-    rejected: '\\[SUPERVISOR:REJECT\\]',
-  },
+/**
+ * Generic status patterns that match any role name
+ * Format: [ROLE:COMMAND] where ROLE is any word characters
+ *
+ * This allows new agents to be added without modifying this file.
+ * Custom agents can override these patterns in their configuration.
+ */
+export const GENERIC_STATUS_PATTERNS: Record<string, string> = {
+  approved: '\\[\\w+:APPROVE\\]',
+  rejected: '\\[\\w+:REJECT\\]',
+  improve: '\\[\\w+:IMPROVE\\]',
+  done: '\\[\\w+:(DONE|FIXED)\\]',
+  blocked: '\\[\\w+:BLOCKED\\]',
 };
+
+

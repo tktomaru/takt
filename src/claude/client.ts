@@ -7,7 +7,7 @@
 import { executeClaudeCli, type ClaudeSpawnOptions, type StreamCallback, type PermissionHandler, type AskUserQuestionHandler } from './process.js';
 import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
 import type { AgentResponse, Status } from '../models/types.js';
-import { DEFAULT_STATUS_PATTERNS } from '../models/schemas.js';
+import { GENERIC_STATUS_PATTERNS } from '../models/schemas.js';
 
 /** Options for calling Claude */
 export interface ClaudeCallOptions {
@@ -75,8 +75,9 @@ export function isRegexSafe(pattern: string): boolean {
 }
 
 /** Get status patterns for a built-in agent type */
-export function getBuiltinStatusPatterns(agentType: string): Record<string, string> {
-  return DEFAULT_STATUS_PATTERNS[agentType] || {};
+export function getBuiltinStatusPatterns(_agentType: string): Record<string, string> {
+  // Uses generic patterns that work for any agent
+  return GENERIC_STATUS_PATTERNS;
 }
 
 /** Determine status from result */

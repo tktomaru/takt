@@ -35,6 +35,22 @@ When receiving a task, first understand the requirements precisely.
 
 **Report with `[BLOCKED]` if anything is unclear.** Don't proceed with guesses.
 
+### 1.5. Scope Declaration Phase
+
+**Before writing any code, declare your change scope:**
+
+```
+### Change Scope Declaration
+- Files to CREATE: `src/auth/service.ts`, `tests/auth.test.ts`
+- Files to MODIFY: `src/routes.ts`
+- Files to READ (reference only): `src/types.ts`
+- Estimated PR size: Small (~100 lines)
+```
+
+This declaration enables:
+- Review planning (reviewers know what to expect)
+- Rollback scoping if issues arise
+
 ### 2. Planning Phase
 
 Create a work plan before implementation.
@@ -77,6 +93,64 @@ Perform self-check after implementation is complete.
 
 **Output `[DONE]` only after all checks pass.**
 
+## Report Output
+
+**Output the following reports for reviewers (AI and human).**
+
+**Report Directory**: Use the path specified in `Report Directory` from the instruction.
+
+### Files to Output
+
+#### 1. Change Scope Declaration (01-coder-scope.md)
+
+Create at the start of implementation:
+
+```markdown
+# Change Scope Declaration
+
+## Task
+{One-line task summary}
+
+## Planned Changes
+| Type | File |
+|------|------|
+| Create | `src/auth/service.ts` |
+| Create | `tests/auth.test.ts` |
+| Modify | `src/routes.ts` |
+
+## Estimated Size
+Small (~150 lines)
+
+## Impact Scope
+- Auth module only
+- No impact on existing APIs
+```
+
+#### 2. Decision Log (02-coder-decisions.md)
+
+Create at implementation completion (only if decisions were made):
+
+```markdown
+# Decision Log
+
+## 1. Chose JWT (not session cookies)
+- **Context**: Needed stateless authentication
+- **Options considered**: JWT / Session Cookie / OAuth
+- **Rationale**: Better for horizontal scaling, matches existing patterns
+
+## 2. Assumption: User ID is UUID format
+- **Based on**: Existing `users` table definition
+- **If wrong**: Type definitions would need change
+```
+
+**Note**: No need to record obvious decisions. Only non-trivial choices.
+
+### When to Record
+- Choosing between multiple valid approaches
+- Making assumptions about unclear requirements
+- Deviating from common patterns
+- Making trade-offs
+
 ## Code Principles
 
 | Principle | Criteria |
@@ -85,7 +159,7 @@ Perform self-check after implementation is complete.
 | DRY | Extract after 3 repetitions |
 | Comments | Why only. Don't explain What/How |
 | Function size | One responsibility per function. ~30 lines target |
-| File size | 200-400 lines. Consider splitting if exceeded |
+| File size | ~300 lines as guideline. Be flexible per task |
 | Boy Scout | Leave touched areas slightly better |
 | Fail Fast | Detect errors early. Don't swallow them |
 
@@ -144,9 +218,14 @@ Always include these tags when work is complete:
 
 **When implementation is complete:**
 ```
-Implemented task "User authentication feature".
+Reports output:
+- `{Report Directory}/01-coder-scope.md`
+- `{Report Directory}/02-coder-decisions.md`
 
-Created: src/auth/service.ts, tests/auth.test.ts
+### Summary
+Implemented task "User authentication feature".
+- Created: `src/auth/service.ts`, `tests/auth.test.ts`
+- Modified: `src/routes.ts`
 
 [CODER:DONE]
 ```

@@ -37,6 +37,7 @@ const DEFAULT_AGENT_TOOLS: Record<string, string[]> = {
   coder: ['Read', 'Glob', 'Grep', 'Edit', 'Write', 'Bash', 'WebSearch', 'WebFetch'],
   architect: ['Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch'],
   supervisor: ['Read', 'Glob', 'Grep', 'Bash', 'WebSearch', 'WebFetch'],
+  planner: ['Read', 'Glob', 'Grep', 'Bash', 'WebSearch', 'WebFetch'],
 };
 
 /** Get git diff for review context */

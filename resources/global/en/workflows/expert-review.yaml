@@ -1,0 +1,441 @@
+# Expert Review Workflow
+# Review workflow with CQRS+ES, Frontend, Security, and QA experts
+#
+# Flow:
+# implement -> cqrs_es_review -> frontend_review -> security_review -> qa_review -> supervise -> COMPLETE
+#                 ↓                  ↓                   ↓                ↓            ↓
+#            fix_cqrs_es       fix_frontend         fix_security     fix_qa     fix_supervisor
+#
+# Fix destination is determined by Coder based on change impact:
+# - fix_security: MINOR→security_review, MAJOR→cqrs_es_review
+# - fix_qa: MINOR→qa_review, SECURITY→security_review, MAJOR→cqrs_es_review
+
+name: expert-review
+description: CQRS+ES, Frontend, Security, QA Expert Review
+
+max_iterations: 20
+
+steps:
+  - name: implement
+    agent: ~/.takt/agents/default/coder.md
+    instruction_template: |
+      ## Workflow Context
+      - Iteration: {iteration}/{max_iterations}
+      - Step: implement
+
+      ## Original User Request (This is the original request, not the latest instruction)
+      {task}
+
+      ## Additional User Inputs (Information added during workflow)
+      {user_inputs}
+
+      ## Instructions
+      **Important**: The "Original User Request" above is the initial request when the workflow started.
+      If this is iteration 2 or later, research should already be completed.
+      Check the session conversation history and continue from where the previous work left off.
+
+      - Iteration 1: Understand the request and research if needed
+      - Iteration 2+: Continue implementation based on previous work
+
+      Include [CODER:DONE] when complete.
+      Include [CODER:BLOCKED] if unable to proceed.
+    transitions:
+      - condition: done
+        next_step: cqrs_es_review
+      - condition: blocked
+        next_step: implement
+
+  # ===========================================
+  # Phase 1: CQRS+ES Review
+  # ===========================================
+  - name: cqrs_es_review
+    agent: ~/.takt/agents/expert-review/cqrs-es-reviewer.md
+    instruction_template: |
+      ## Workflow Context
+      - Iteration: {iteration}/{max_iterations}
+      - Step: cqrs_es_review (CQRS+ES Expert Review)
+
+      ## Original User Request
+      {task}
+
+      ## Git Diff
+      ```diff
+      {git_diff}
+      ```
+
+      ## Instructions
+      Review the changes above from the CQRS (Command Query Responsibility Segregation)
+      and Event Sourcing perspective.
+
+      **Review Criteria:**
+      - Aggregate design validity
+      - Event design (granularity, naming, schema)
+      - Command/Query separation
+      - Projection design
+      - Eventual consistency considerations
+
+      **Note**: If this project does not use CQRS+ES patterns,
+      review from a general domain design perspective.
+
+      Include:
+      - [CQRS-ES:APPROVE] if CQRS+ES design is sound
+      - [CQRS-ES:REJECT] if design issues found (list specific issues)
+    transitions:
+      - condition: approved
+        next_step: frontend_review
+      - condition: rejected
+        next_step: fix_cqrs_es
+
+  - name: fix_cqrs_es
+    agent: ~/.takt/agents/default/coder.md
+    instruction_template: |
+      ## Workflow Context
+      - Iteration: {iteration}/{max_iterations}
+      - Step: fix_cqrs_es
+
+      ## CQRS+ES Review Feedback (This is the latest instruction - prioritize this)
+      {previous_response}
+
+      ## Original User Request (Initial request - for reference)
+      {task}
+
+      ## Additional User Inputs
+      {user_inputs}
+
+      ## Instructions
+      **Important**: Fix the issues pointed out by the CQRS+ES expert.
+
+      Areas of concern:
+      - Aggregate design
+      - Event design
+      - Command/Query separation
+      - Projections
+      - Eventual consistency
+
+      Include [CODER:DONE] when complete.
+      Include [CODER:BLOCKED] if unable to proceed.
+    pass_previous_response: true
+    transitions:
+      - condition: done
+        next_step: cqrs_es_review
+      - condition: blocked
+        next_step: fix_cqrs_es
+
+  # ===========================================
+  # Phase 2: Frontend Review
+  # ===========================================
+  - name: frontend_review
+    agent: ~/.takt/agents/expert-review/frontend-reviewer.md
+    instruction_template: |
+      ## Workflow Context
+      - Iteration: {iteration}/{max_iterations}
+      - Step: frontend_review (Frontend Expert Review)
+
+      ## Original User Request
+      {task}
+
+      ## Git Diff
+      ```diff
+      {git_diff}
+      ```
+
+      ## Instructions
+      Review the changes above from the frontend development perspective.
+
+      **Review Criteria:**
+      - Component design (separation of concerns, granularity)
+      - State management (local/global decisions)
+      - Performance (re-rendering, memoization)
+      - Accessibility (keyboard support, ARIA)
+      - Data fetching patterns
+      - TypeScript type safety
+
+      **Note**: If this project does not include frontend code,
+      output [FRONTEND:APPROVE] and proceed.
+
+      Include:
+      - [FRONTEND:APPROVE] if frontend design is sound
+      - [FRONTEND:REJECT] if design issues found (list specific issues)
+    transitions:
+      - condition: approved
+        next_step: security_review
+      - condition: rejected
+        next_step: fix_frontend
+
+  - name: fix_frontend
+    agent: ~/.takt/agents/default/coder.md
+    instruction_template: |
+      ## Workflow Context
+      - Iteration: {iteration}/{max_iterations}
+      - Step: fix_frontend
+
+      ## Frontend Review Feedback (This is the latest instruction - prioritize this)
+      {previous_response}
+
+      ## Original User Request (Initial request - for reference)
+      {task}
+
+      ## Additional User Inputs
+      {user_inputs}
+
+      ## Instructions
+      **Important**: Fix the issues pointed out by the frontend expert.
+
+      Areas of concern:
+      - Component design
+      - State management
+      - Performance
+      - Accessibility
+      - Type safety
+
+      Include [CODER:DONE] when complete.
+      Include [CODER:BLOCKED] if unable to proceed.
+    pass_previous_response: true
+    transitions:
+      - condition: done
+        next_step: frontend_review
+      - condition: blocked
+        next_step: fix_frontend
+
+  # ===========================================
+  # Phase 3: Security Review
+  # ===========================================
+  - name: security_review
+    agent: ~/.takt/agents/expert-review/security-reviewer.md
+    instruction_template: |
+      ## Workflow Context
+      - Iteration: {iteration}/{max_iterations}
+      - Step: security_review (Security Expert Review)
+
+      ## Original User Request
+      {task}
+
+      ## Git Diff
+      ```diff
+      {git_diff}
+      ```
+
+      ## Instructions
+      Review the changes above from the security perspective.
+
+      **Review Criteria:**
+      - Injection attacks (SQL, command, XSS)
+      - Authentication/authorization flaws
+      - Sensitive information handling
+      - Encryption appropriateness
+      - OWASP Top 10
+
+      Include:
+      - [SECURITY:APPROVE] if no security issues found
+      - [SECURITY:REJECT] if vulnerabilities found (list specific issues with severity)
+    transitions:
+      - condition: approved
+        next_step: qa_review
+      - condition: rejected
+        next_step: fix_security
+
+  - name: fix_security
+    agent: ~/.takt/agents/default/coder.md
+    instruction_template: |
+      ## Workflow Context
+      - Iteration: {iteration}/{max_iterations}
+      - Step: fix_security
+
+      ## Security Review Feedback (This is the latest instruction - prioritize this)
+      {previous_response}
+
+      ## Original User Request (Initial request - for reference)
+      {task}
+
+      ## Additional User Inputs
+      {user_inputs}
+
+      ## Instructions
+      **Important**: Fix the issues pointed out by the security expert.
+      Security issues should be addressed with highest priority.
+
+      Areas of concern:
+      - Injection vulnerabilities
+      - Authentication/authorization flaws
+      - Sensitive information exposure
+      - Encryption issues
+
+      ## Completion: Determine Change Impact
+      When fix is complete, judge the **impact scope of changes** and output the appropriate tag:
+
+      - `[CODER:MINOR]` - Minor fix (re-run security review only)
+        - Examples: Add validation, add escaping, configuration changes
+      - `[CODER:MAJOR]` - Major fix (restart from CQRS+ES review)
+        - Examples: Data flow changes, API design changes, auth method changes, domain model changes
+
+      Include [CODER:BLOCKED] if unable to proceed.
+    pass_previous_response: true
+    transitions:
+      - condition: minor
+        next_step: security_review
+      - condition: major
+        next_step: cqrs_es_review
+      - condition: blocked
+        next_step: fix_security
+
+  # ===========================================
+  # Phase 4: QA Review
+  # ===========================================
+  - name: qa_review
+    agent: ~/.takt/agents/expert-review/qa-reviewer.md
+    instruction_template: |
+      ## Workflow Context
+      - Iteration: {iteration}/{max_iterations}
+      - Step: qa_review (QA Expert Review)
+
+      ## Original User Request
+      {task}
+
+      ## Git Diff
+      ```diff
+      {git_diff}
+      ```
+
+      ## Instructions
+      Review the changes above from the quality assurance perspective.
+
+      **Review Criteria:**
+      - Test coverage and quality
+      - Test strategy (unit/integration/E2E)
+      - Documentation (in-code and external)
+      - Error handling
+      - Logging and monitoring
+      - Maintainability
+
+      Include:
+      - [QA:APPROVE] if quality standards are met
+      - [QA:REJECT] if quality issues found (list specific issues)
+    transitions:
+      - condition: approved
+        next_step: supervise
+      - condition: rejected
+        next_step: fix_qa
+
+  - name: fix_qa
+    agent: ~/.takt/agents/default/coder.md
+    instruction_template: |
+      ## Workflow Context
+      - Iteration: {iteration}/{max_iterations}
+      - Step: fix_qa
+
+      ## QA Review Feedback (This is the latest instruction - prioritize this)
+      {previous_response}
+
+      ## Original User Request (Initial request - for reference)
+      {task}
+
+      ## Additional User Inputs
+      {user_inputs}
+
+      ## Instructions
+      **Important**: Fix the issues pointed out by the QA expert.
+
+      Areas of concern:
+      - Adding/improving tests
+      - Adding/fixing documentation
+      - Error handling
+      - Log output
+      - Code quality
+
+      ## Completion: Determine Change Impact
+      When fix is complete, judge the **impact scope of changes** and output the appropriate tag:
+
+      - `[CODER:MINOR]` - Minor fix (re-run QA review only)
+        - Examples: Add tests, add documentation, add logs, add comments
+      - `[CODER:SECURITY]` - Security-impacting fix (restart from security review)
+        - Examples: Error handling changes (error message content changes), input validation changes
+      - `[CODER:MAJOR]` - Major fix (restart from CQRS+ES review)
+        - Examples: Business logic changes, data model changes, API changes
+
+      Include [CODER:BLOCKED] if unable to proceed.
+    pass_previous_response: true
+    transitions:
+      - condition: minor
+        next_step: qa_review
+      - condition: security
+        next_step: security_review
+      - condition: major
+        next_step: cqrs_es_review
+      - condition: blocked
+        next_step: fix_qa
+
+  # ===========================================
+  # Phase 5: Supervision
+  # ===========================================
+  - name: supervise
+    agent: ~/.takt/agents/expert-review/supervisor.md
+    instruction_template: |
+      ## Workflow Context
+      - Iteration: {iteration}/{max_iterations}
+      - Step: supervise (Final Review)
+
+      ## Original User Request
+      {task}
+
+      ## Git Diff
+      ```diff
+      {git_diff}
+      ```
+
+      ## Previous Reviews Summary
+      Reaching this step means all the following reviews have been APPROVED:
+      - CQRS+ES Review: APPROVED
+      - Frontend Review: APPROVED
+      - Security Review: APPROVED
+      - QA Review: APPROVED
+
+      ## Instructions
+      As supervisor, oversee all review results and make the final decision.
+
+      **Review Criteria:**
+      - Are there contradictions between review results?
+      - Are original requirements met?
+      - Is overall consistency maintained?
+      - Is it release-worthy quality?
+
+      Include:
+      - [SUPERVISOR:APPROVE] if ready for release
+      - [SUPERVISOR:REJECT] if additional work needed (list specific items)
+    transitions:
+      - condition: approved
+        next_step: COMPLETE
+      - condition: rejected
+        next_step: fix_supervisor
+
+  - name: fix_supervisor
+    agent: ~/.takt/agents/default/coder.md
+    instruction_template: |
+      ## Workflow Context
+      - Iteration: {iteration}/{max_iterations}
+      - Step: fix_supervisor
+
+      ## Supervisor Feedback (This is the latest instruction - prioritize this)
+      {previous_response}
+
+      ## Original User Request (Initial request - for reference)
+      {task}
+
+      ## Additional User Inputs
+      {user_inputs}
+
+      ## Instructions
+      **Important**: Fix the issues pointed out by the supervisor.
+
+      The supervisor has identified issues from a big-picture perspective.
+      Address items in priority order.
+
+      Include [CODER:DONE] when complete.
+      Include [CODER:BLOCKED] if unable to proceed.
+    pass_previous_response: true
+    transitions:
+      - condition: done
+        next_step: supervise
+      - condition: blocked
+        next_step: fix_supervisor
+
+initial_step: implement

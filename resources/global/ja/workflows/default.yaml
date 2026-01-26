@@ -1,47 +1,83 @@
 # Default TAKT Workflow
-# Coder -> Architect Review -> Security Review -> Supervisor Approval
+# Plan -> Coder -> Architect Review -> AI Review -> Security Review -> Supervisor Approval
 
 name: default
-description: Standard development workflow with code review
+description: Standard development workflow with planning and specialized reviews
 
-max_iterations: 10
+max_iterations: 20
+
+initial_step: plan
 
 steps:
+  - name: plan
+    agent: ~/.takt/agents/default/planner.md
+    instruction_template: |
+      ## Workflow Context
+      - Iteration: {iteration}/{max_iterations}
+      - Step: plan (タスク分析)
+      - Report Directory: .takt/reports/{report_dir}/
+
+      ## User Request
+      {task}
+
+      ## Previous Response (implementからの差し戻し時)
+      {previous_response}
+
+      ## Instructions
+      タスクを分析し、実装方針を立ててください。
+
+      **注意:** Previous Responseがある場合は差し戻しのため、
+      その内容を踏まえて計画を見直してください（replan）。
+
+      **やること:**
+      1. タスクの要件を理解する
+      2. 影響範囲を特定する
+      3. 実装アプローチを決める
+
+      **レポート出力:** `.takt/reports/{report_dir}/00-plan.md`
+
+      完了したら [PLANNER:DONE] を出力。
+      要件が不明確な場合は [PLANNER:BLOCKED] を出力。
+    pass_previous_response: true
+    transitions:
+      - condition: done
+        next_step: implement
+      - condition: blocked
+        next_step: ABORT
+
   - name: implement
     agent: ~/.takt/agents/default/coder.md
     instruction_template: |
       ## Workflow Context
       - Iteration: {iteration}/{max_iterations}
       - Step: implement
+      - Report Directory: .takt/reports/{report_dir}/
 
-      ## Original User Request (これは最新の指示ではなく、ワークフロー開始時の元の要求です)
+      ## User Request
       {task}
 
-      ## Additional User Inputs (ワークフロー中に追加された情報)
+      ## Additional User Inputs
       {user_inputs}
 
       ## Instructions
-      **重要**: 上記の「Original User Request」はワークフロー開始時の元の要求です。
-      イテレーション2回目以降の場合、すでにリサーチや調査は完了しているはずです。
-      セッションの会話履歴を確認し、前回の作業の続きから進めてください。
-
-      - イテレーション1: 要求を理解し、必要ならリサーチを行う
-      - イテレーション2以降: 前回の作業結果を踏まえて実装を進める
+      planステップで立てた計画に従って実装してください。
+      計画レポート（00-plan.md）を参照し、実装を進めてください。
 
       完了時は [CODER:DONE] を含めてください。
-      進行できない場合は [CODER:BLOCKED] を含めてください。
+      進行できない場合は [CODER:BLOCKED] を出力し、planに戻ります。
     transitions:
       - condition: done
         next_step: review
       - condition: blocked
-        next_step: implement
+        next_step: plan
 
   - name: review
     agent: ~/.takt/agents/default/architect.md
     instruction_template: |
       ## Workflow Context
       - Iteration: {iteration}/{max_iterations}
-      - Step: review
+      - Step: review (アーキテクチャレビュー)
+      - Report Directory: .takt/reports/{report_dir}/
 
       ## Original User Request (ワークフロー開始時の元の要求)
       {task}
@@ -52,14 +88,123 @@ steps:
       ```
 
       ## Instructions
-      Review the changes and provide feedback. Include:
-      - [ARCHITECT:APPROVE] if the code is ready
-      - [ARCHITECT:REJECT] if changes are needed (list specific issues)
+      **アーキテクチャと設計**のレビューに集中してください。AI特有の問題はレビューしないでください（次のステップで行います）。
+
+      変更をレビューしてフィードバックを提供してください:
+      - [ARCHITECT:APPROVE] 問題なしの場合
+      - [ARCHITECT:IMPROVE] 改善すべき点がある場合（軽微な修正）
+      - [ARCHITECT:REJECT] 構造的な変更が必要な場合（具体的な問題をリスト）
+
+      レポートは上記のReport Directoryに出力してください。
+    transitions:
+      - condition: approved
+        next_step: ai_review
+      - condition: improve
+        next_step: improve
+      - condition: rejected
+        next_step: fix
+
+  - name: improve
+    agent: ~/.takt/agents/default/coder.md
+    instruction_template: |
+      ## Workflow Context
+      - Iteration: {iteration}/{max_iterations}
+      - Step: improve
+
+      ## Architect Feedback (これが最新の指示です - 優先して対応してください)
+      {previous_response}
+
+      ## Original User Request (ワークフロー開始時の元の要求 - 参考情報)
+      {task}
+
+      ## Additional User Inputs
+      {user_inputs}
+
+      ## Instructions
+      **重要**: Architectの改善提案に対応してください。
+      これらは軽微な改善であり、設計上の大きな問題ではありません。
+
+      以下のような改善を行ってください:
+      - 命名の改善
+      - 小さなリファクタリング
+      - コメントの追加・修正
+      - コードの整理
+
+      完了時は [CODER:DONE] を含めてください。
+      進行できない場合は [CODER:BLOCKED] を含めてください。
+    pass_previous_response: true
+    transitions:
+      - condition: done
+        next_step: review
+      - condition: blocked
+        next_step: plan
+
+  - name: ai_review
+    agent: ~/.takt/agents/default/ai-reviewer.md
+    instruction_template: |
+      ## Workflow Context
+      - Iteration: {iteration}/{max_iterations}
+      - Step: ai_review (AI生成コードレビュー)
+      - Report Directory: .takt/reports/{report_dir}/
+
+      ## Original User Request (ワークフロー開始時の元の要求)
+      {task}
+
+      ## Git Diff
+      ```diff
+      {git_diff}
+      ```
+
+      ## Instructions
+      AI特有の問題についてコードをレビューしてください:
+      - 仮定の検証
+      - もっともらしいが間違っているパターン
+      - 既存コードベースとの適合性
+      - スコープクリープの検出
+
+      以下を含めてください:
+      - [AI_REVIEW:APPROVE] AI特有の問題が見つからない場合
+      - [AI_REVIEW:REJECT] 問題が検出された場合（具体的な問題をリスト）
+
+      レポートは上記のReport Directoryに出力してください。
     transitions:
       - condition: approved
         next_step: security_review
       - condition: rejected
-        next_step: fix
+        next_step: ai_fix
+
+  - name: ai_fix
+    agent: ~/.takt/agents/default/coder.md
+    instruction_template: |
+      ## Workflow Context
+      - Iteration: {iteration}/{max_iterations}
+      - Step: ai_fix
+
+      ## AI Review Feedback (これが最新の指示です - 優先して対応してください)
+      {previous_response}
+
+      ## Original User Request (ワークフロー開始時の元の要求 - 参考情報)
+      {task}
+
+      ## Additional User Inputs
+      {user_inputs}
+
+      ## Instructions
+      **重要**: AI Reviewerのフィードバックに対応してください。
+      以下に集中してください:
+      - 間違った仮定の修正
+      - もっともらしいが間違っている実装の修正
+      - 既存コードベースのパターンとの整合
+      - スコープクリープの除去
+
+      完了時は [CODER:DONE] を含めてください。
+      進行できない場合は [CODER:BLOCKED] を含めてください。
+    pass_previous_response: true
+    transitions:
+      - condition: done
+        next_step: review
+      - condition: blocked
+        next_step: plan
 
   - name: security_review
     agent: ~/.takt/agents/default/security.md
@@ -67,6 +212,7 @@ steps:
       ## Workflow Context
       - Iteration: {iteration}/{max_iterations}
       - Step: security_review
+      - Report Directory: .takt/reports/{report_dir}/
 
       ## Original User Request (ワークフロー開始時の元の要求)
       {task}
@@ -86,6 +232,8 @@ steps:
       Include:
       - [SECURITY:APPROVE] if no security issues found
       - [SECURITY:REJECT] if vulnerabilities detected (list specific issues)
+
+      Output report to the Report Directory above.
     transitions:
       - condition: approved
         next_step: supervise
@@ -119,7 +267,7 @@ steps:
       - condition: done
         next_step: security_review
       - condition: blocked
-        next_step: security_fix
+        next_step: plan
 
   - name: fix
     agent: ~/.takt/agents/default/coder.md
@@ -149,7 +297,7 @@ steps:
       - condition: done
         next_step: review
       - condition: blocked
-        next_step: fix
+        next_step: plan
 
   - name: supervise
     agent: ~/.takt/agents/default/supervisor.md
@@ -157,6 +305,7 @@ steps:
       ## Workflow Context
       - Iteration: {iteration}/{max_iterations}
       - Step: supervise (final verification)
+      - Report Directory: .takt/reports/{report_dir}/
 
       ## Original User Request
       {task}
@@ -167,11 +316,21 @@ steps:
       ```
 
       ## Instructions
-      Run tests, verify the build, and perform final approval.
-      - [SUPERVISOR:APPROVE] if ready to merge
-      - [SUPERVISOR:REJECT] if issues found
+      テスト実行、ビルド確認、最終承認を行ってください。
+
+      **ワークフロー全体の確認:**
+      1. 計画（00-plan.md）と実装結果が一致しているか
+      2. 各レビューステップの指摘が対応されているか
+      3. 元のタスク目的が達成されているか
+
+      **レポートの確認:** Report Directory内の全レポートを読み、
+      未対応の改善提案がないか確認してください。
+
+      出力:
+      - [SUPERVISOR:APPROVE] すべて完了、マージ可能
+      - [SUPERVISOR:REJECT] 問題あり（具体的な問題を記載）
     transitions:
       - condition: approved
         next_step: COMPLETE
       - condition: rejected
-        next_step: fix
+        next_step: plan

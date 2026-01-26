@@ -24,6 +24,8 @@ export interface InstructionContext {
   userInputs: string[];
   /** Previous step output if available */
   previousOutput?: AgentResponse;
+  /** Report directory path */
+  reportDir?: string;
 }
 
 /**
@@ -43,6 +45,7 @@ function escapeTemplateChars(str: string): string {
  * - {previous_response} - Output from previous step (if passPreviousResponse is true)
  * - {git_diff} - Current git diff output
  * - {user_inputs} - Accumulated user inputs
+ * - {report_dir} - Report directory name (e.g., "20250126-143052-task-summary")
  */
 export function buildInstruction(
   step: WorkflowStep,
@@ -79,6 +82,11 @@ export function buildInstruction(
     /\{user_inputs\}/g,
     escapeTemplateChars(userInputsStr)
   );
+
+  // Replace {report_dir}
+  if (context.reportDir) {
+    instruction = instruction.replace(/\{report_dir\}/g, context.reportDir);
+  }
 
   return instruction;
 }

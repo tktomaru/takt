@@ -73,8 +73,19 @@ describe('getBuiltinStatusPatterns', () => {
     expect(patterns.rejected).toBeDefined();
   });
 
-  it('should return empty object for unknown agent', () => {
+  it('should return generic patterns for unknown agent', () => {
+    // With generic patterns, any agent gets the standard patterns
     const patterns = getBuiltinStatusPatterns('unknown');
-    expect(patterns).toEqual({});
+    expect(patterns.approved).toBeDefined();
+    expect(patterns.rejected).toBeDefined();
+    expect(patterns.done).toBeDefined();
+    expect(patterns.blocked).toBeDefined();
+  });
+
+  it('should detect status using generic patterns for any agent', () => {
+    // Generic patterns work for any [ROLE:COMMAND] format
+    const patterns = getBuiltinStatusPatterns('my-custom-agent');
+    const content = '[MY_CUSTOM_AGENT:APPROVE]';
+    expect(detectStatus(content, patterns)).toBe('approved');
   });
 });

@@ -10,7 +10,7 @@ import {
   WorkflowConfigRawSchema,
   CustomAgentConfigSchema,
   GlobalConfigSchema,
-  DEFAULT_STATUS_PATTERNS,
+  GENERIC_STATUS_PATTERNS,
 } from '../models/schemas.js';
 
 describe('AgentTypeSchema', () => {
@@ -151,52 +151,28 @@ describe('GlobalConfigSchema', () => {
   });
 });
 
-describe('DEFAULT_STATUS_PATTERNS', () => {
-  it('should have patterns for built-in agents', () => {
-    expect(DEFAULT_STATUS_PATTERNS.coder).toBeDefined();
-    expect(DEFAULT_STATUS_PATTERNS.architect).toBeDefined();
-    expect(DEFAULT_STATUS_PATTERNS.supervisor).toBeDefined();
-  });
-
-  it('should have patterns for MAGI system agents', () => {
-    expect(DEFAULT_STATUS_PATTERNS.melchior).toBeDefined();
-    expect(DEFAULT_STATUS_PATTERNS.balthasar).toBeDefined();
-    expect(DEFAULT_STATUS_PATTERNS.casper).toBeDefined();
-
-    // MAGI agents should have approved/rejected patterns
-    expect(DEFAULT_STATUS_PATTERNS.melchior.approved).toBeDefined();
-    expect(DEFAULT_STATUS_PATTERNS.melchior.rejected).toBeDefined();
-    expect(DEFAULT_STATUS_PATTERNS.balthasar.approved).toBeDefined();
-    expect(DEFAULT_STATUS_PATTERNS.balthasar.rejected).toBeDefined();
-    expect(DEFAULT_STATUS_PATTERNS.casper.approved).toBeDefined();
-    expect(DEFAULT_STATUS_PATTERNS.casper.rejected).toBeDefined();
-  });
-
-  it('should have patterns for research workflow agents', () => {
-    expect(DEFAULT_STATUS_PATTERNS.planner).toBeDefined();
-    expect(DEFAULT_STATUS_PATTERNS.digger).toBeDefined();
-
-    expect(DEFAULT_STATUS_PATTERNS.planner.done).toBeDefined();
-    expect(DEFAULT_STATUS_PATTERNS.digger.done).toBeDefined();
+describe('GENERIC_STATUS_PATTERNS', () => {
+  it('should have all standard status patterns', () => {
+    expect(GENERIC_STATUS_PATTERNS.approved).toBeDefined();
+    expect(GENERIC_STATUS_PATTERNS.rejected).toBeDefined();
+    expect(GENERIC_STATUS_PATTERNS.done).toBeDefined();
+    expect(GENERIC_STATUS_PATTERNS.blocked).toBeDefined();
+    expect(GENERIC_STATUS_PATTERNS.improve).toBeDefined();
   });
 
   it('should have valid regex patterns', () => {
-    for (const agentPatterns of Object.values(DEFAULT_STATUS_PATTERNS)) {
-      for (const pattern of Object.values(agentPatterns)) {
-        expect(() => new RegExp(pattern)).not.toThrow();
-      }
+    for (const pattern of Object.values(GENERIC_STATUS_PATTERNS)) {
+      expect(() => new RegExp(pattern)).not.toThrow();
     }
   });
 
-  it('should match expected status markers', () => {
-    // MAGI patterns
-    expect(new RegExp(DEFAULT_STATUS_PATTERNS.melchior.approved).test('[MELCHIOR:APPROVE]')).toBe(true);
-    expect(new RegExp(DEFAULT_STATUS_PATTERNS.melchior.conditional).test('[MELCHIOR:CONDITIONAL]')).toBe(true);
-    expect(new RegExp(DEFAULT_STATUS_PATTERNS.casper.approved).test('[MAGI:APPROVE]')).toBe(true);
-    expect(new RegExp(DEFAULT_STATUS_PATTERNS.casper.conditional).test('[MAGI:CONDITIONAL]')).toBe(true);
-
-    // Research patterns
-    expect(new RegExp(DEFAULT_STATUS_PATTERNS.planner.done).test('[PLANNER:DONE]')).toBe(true);
-    expect(new RegExp(DEFAULT_STATUS_PATTERNS.digger.done).test('[DIGGER:DONE]')).toBe(true);
+  it('should match any [ROLE:COMMAND] format', () => {
+    // Generic patterns match any role
+    expect(new RegExp(GENERIC_STATUS_PATTERNS.approved).test('[CODER:APPROVE]')).toBe(true);
+    expect(new RegExp(GENERIC_STATUS_PATTERNS.approved).test('[MY_AGENT:APPROVE]')).toBe(true);
+    expect(new RegExp(GENERIC_STATUS_PATTERNS.done).test('[CUSTOM:DONE]')).toBe(true);
+    expect(new RegExp(GENERIC_STATUS_PATTERNS.done).test('[CODER:FIXED]')).toBe(true);
+    expect(new RegExp(GENERIC_STATUS_PATTERNS.improve).test('[MAGI:IMPROVE]')).toBe(true);
   });
 });
+

@@ -22,6 +22,7 @@ export type TransitionCondition =
   | 'blocked'
   | 'approved'
   | 'rejected'
+  | 'improve'
   | 'always';
 
 /** Response from an agent execution */
