@@ -22,7 +22,7 @@ import {
   copyLanguageResourcesToDir,
   copyProjectResourcesToDir,
 } from '../resources/index.js';
-import { setLanguage } from './globalConfig.js';
+import { setLanguage, setProvider } from './globalConfig.js';
 
 /**
  * Check if language-specific resources need to be initialized.
@@ -52,6 +52,22 @@ export async function promptLanguageSelection(): Promise<Language> {
 }
 
 /**
+ * Prompt user to select provider for resources.
+ */
+export async function promptProviderSelection(): Promise<'claude' | 'codex'> {
+  const options: { label: string; value: 'claude' | 'codex' }[] = [
+    { label: 'Claude Code', value: 'claude' },
+    { label: 'Codex', value: 'codex' },
+  ];
+
+  return await selectOptionWithDefault(
+    'Select provider (Claude Code or Codex) / プロバイダーを選択してください:',
+    options,
+    'claude'
+  );
+}
+
+/**
  * Initialize global takt directory structure with language selection.
  * If agents/workflows don't exist, prompts user for language preference.
  */
@@ -65,12 +81,14 @@ export async function initGlobalDirs(): Promise<void> {
   if (needsSetup) {
     // Ask user for language preference
     const lang = await promptLanguageSelection();
+    const provider = await promptProviderSelection();
 
     // Copy language-specific resources (agents, workflows, config.yaml)
     copyLanguageResourcesToDir(getGlobalConfigDir(), lang);
 
     // Explicitly save the selected language (handles case where config.yaml existed)
     setLanguage(lang);
+    setProvider(provider);
   } else {
     // Just copy base global resources (won't overwrite existing)
     copyGlobalResourcesToDir(getGlobalConfigDir());

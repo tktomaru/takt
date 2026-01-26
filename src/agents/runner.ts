@@ -13,7 +13,10 @@ import {
   ClaudeCallOptions,
 } from '../claude/client.js';
 import { type StreamCallback, type PermissionHandler, type AskUserQuestionHandler } from '../claude/process.js';
+import { callCodex, callCodexCustom, type CodexCallOptions } from '../codex/client.js';
 import { loadCustomAgents, loadAgentPrompt } from '../config/loader.js';
+import { loadGlobalConfig } from '../config/globalConfig.js';
+import { loadProjectConfig } from '../config/projectConfig.js';
 import type { AgentResponse, CustomAgentConfig } from '../models/types.js';
 
 export type { StreamCallback };
@@ -23,6 +26,7 @@ export interface RunAgentOptions {
   cwd: string;
   sessionId?: string;
   model?: string;
+  provider?: 'claude' | 'codex';
   /** Resolved path to agent prompt file */
   agentPath?: string;
   onStream?: StreamCallback;
@@ -39,6 +43,22 @@ const DEFAULT_AGENT_TOOLS: Record<string, string[]> = {
   supervisor: ['Read', 'Glob', 'Grep', 'Bash', 'WebSearch', 'WebFetch'],
   planner: ['Read', 'Glob', 'Grep', 'Bash', 'WebSearch', 'WebFetch'],
 };
+
+type AgentProvider = 'claude' | 'codex';
+
+function resolveProvider(cwd: string, options?: RunAgentOptions, agentConfig?: CustomAgentConfig): AgentProvider {
+  if (options?.provider) return options.provider;
+  if (agentConfig?.provider) return agentConfig.provider;
+  const projectConfig = loadProjectConfig(cwd);
+  if (projectConfig.provider) return projectConfig.provider;
+  try {
+    const globalConfig = loadGlobalConfig();
+    if (globalConfig.provider) return globalConfig.provider;
+  } catch {
+    // Ignore missing global config; fallback below
+  }
+  return 'claude';
+}
 
 /** Get git diff for review context */
 export function getGitDiff(cwd: string): string {
@@ -102,6 +122,18 @@ export async function runCustomAgent(
   // Custom agent with prompt
   const systemPrompt = loadAgentPrompt(agentConfig);
   const tools = agentConfig.allowedTools || ['Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch'];
+  const provider = resolveProvider(options.cwd, options, agentConfig);
+  if (provider === 'codex') {
+    const callOptions: CodexCallOptions = {
+      cwd: options.cwd,
+      sessionId: options.sessionId,
+      model: options.model || agentConfig.model,
+      statusPatterns: agentConfig.statusPatterns,
+      onStream: options.onStream,
+    };
+    return callCodexCustom(agentConfig.name, task, systemPrompt, callOptions);
+  }
+
   const callOptions: ClaudeCallOptions = {
     cwd: options.cwd,
     sessionId: options.sessionId,
@@ -167,6 +199,18 @@ export async function runAgent(
     }
     const systemPrompt = loadAgentPromptFromPath(options.agentPath);
     const tools = DEFAULT_AGENT_TOOLS[agentName] || ['Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch'];
+    const provider = resolveProvider(options.cwd, options);
+
+    if (provider === 'codex') {
+      const callOptions: CodexCallOptions = {
+        cwd: options.cwd,
+        sessionId: options.sessionId,
+        model: options.model,
+        systemPrompt,
+        onStream: options.onStream,
+      };
+      return callCodex(agentName, task, callOptions);
+    }
 
     const callOptions: ClaudeCallOptions = {
       cwd: options.cwd,

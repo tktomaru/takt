@@ -119,6 +119,17 @@ describe('CustomAgentConfigSchema', () => {
     expect(result.claude_agent).toBe('architect');
   });
 
+  it('should accept agent with provider override', () => {
+    const config = {
+      name: 'my-agent',
+      prompt: 'You are a helpful assistant.',
+      provider: 'codex',
+    };
+
+    const result = CustomAgentConfigSchema.parse(config);
+    expect(result.provider).toBe('codex');
+  });
+
   it('should reject agent without any prompt source', () => {
     const config = {
       name: 'my-agent',
@@ -136,6 +147,7 @@ describe('GlobalConfigSchema', () => {
     expect(result.trusted_directories).toEqual([]);
     expect(result.default_workflow).toBe('default');
     expect(result.log_level).toBe('info');
+    expect(result.provider).toBe('claude');
   });
 
   it('should accept valid config', () => {
@@ -175,4 +187,3 @@ describe('GENERIC_STATUS_PATTERNS', () => {
     expect(new RegExp(GENERIC_STATUS_PATTERNS.improve).test('[MAGI:IMPROVE]')).toBe(true);
   });
 });
-

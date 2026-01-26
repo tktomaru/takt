@@ -13,6 +13,9 @@ default_workflow: default
 # ログレベル: debug, info, warn, error
 log_level: info
 
+# プロバイダー: claude または codex
+provider: claude
+
 # デバッグ設定 (オプション)
 # debug:
 #   enabled: false

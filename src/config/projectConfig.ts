@@ -24,6 +24,8 @@ export type ProjectPermissionMode = PermissionMode;
 export interface ProjectLocalConfig {
   /** Current workflow name */
   workflow?: string;
+  /** Provider selection for agent runtime */
+  provider?: 'claude' | 'codex';
   /** Permission mode setting */
   permissionMode?: PermissionMode;
   /** @deprecated Use permissionMode instead. Auto-approve all permissions in this project */

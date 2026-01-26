@@ -147,6 +147,7 @@ export class WorkflowEngine extends EventEmitter {
       cwd: this.cwd,
       sessionId,
       agentPath: step.agentPath,
+      provider: step.provider,
       onStream: this.options.onStream,
       onPermissionRequest: this.options.onPermissionRequest,
       onAskUserQuestion: this.options.onAskUserQuestion,

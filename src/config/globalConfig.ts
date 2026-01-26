@@ -29,6 +29,7 @@ export function loadGlobalConfig(): GlobalConfig {
     trustedDirectories: parsed.trusted_directories,
     defaultWorkflow: parsed.default_workflow,
     logLevel: parsed.log_level,
+    provider: parsed.provider,
     debug: parsed.debug ? {
       enabled: parsed.debug.enabled,
       logFile: parsed.debug.log_file,
@@ -44,6 +45,7 @@ export function saveGlobalConfig(config: GlobalConfig): void {
     trusted_directories: config.trustedDirectories,
     default_workflow: config.defaultWorkflow,
     log_level: config.logLevel,
+    provider: config.provider,
   };
   if (config.debug) {
     raw.debug = {
@@ -68,6 +70,13 @@ export function getLanguage(): Language {
 export function setLanguage(language: Language): void {
   const config = loadGlobalConfig();
   config.language = language;
+  saveGlobalConfig(config);
+}
+
+/** Set provider setting */
+export function setProvider(provider: 'claude' | 'codex'): void {
+  const config = loadGlobalConfig();
+  config.provider = provider;
   saveGlobalConfig(config);
 }
 

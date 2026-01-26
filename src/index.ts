@@ -13,6 +13,9 @@ export * from './config/index.js';
 // Claude integration
 export * from './claude/index.js';
 
+// Codex integration
+export * from './codex/index.js';
+
 // Agent execution
 export * from './agents/index.js';
 

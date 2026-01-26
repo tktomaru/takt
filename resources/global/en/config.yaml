@@ -13,6 +13,9 @@ default_workflow: default
 # Log level: debug, info, warn, error
 log_level: info
 
+# Provider runtime: claude or codex
+provider: claude
+
 # Debug settings (optional)
 # debug:
 #   enabled: false
