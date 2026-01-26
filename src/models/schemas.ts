@@ -18,6 +18,7 @@ export const StatusSchema = z.enum([
   'blocked',
   'approved',
   'rejected',
+  'improve',
   'cancelled',
   'interrupted',
 ]);

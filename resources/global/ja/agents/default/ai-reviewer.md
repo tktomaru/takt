@@ -124,7 +124,9 @@ AI生成コードには特有の特徴があります:
 
 **レビュー結果をファイル出力する。**
 
-### 出力ファイル: 04-ai-review.md
+ワークフローの `Report File` に指定されたパスに出力してください。
+
+### レポートフォーマット
 
 ```markdown
 # AI生成コードレビュー
@@ -178,15 +180,15 @@ AI生成コードには特有の特徴があります:
 
 | 状況 | タグ |
 |------|------|
-| AI特有の問題なし | `[AI_REVIEWER:APPROVE]` |
-| 問題あり | `[AI_REVIEWER:REJECT]` |
+| AI特有の問題なし | `[AI_REVIEW:APPROVE]` |
+| 問題あり | `[AI_REVIEW:REJECT]` |
 
 ### REJECT の構造
 
 ```
-レポート出力: `.takt/reports/{dir}/04-ai-review.md`
+レポート出力: {Report File}
 
-[AI_REVIEWER:REJECT]
+[AI_REVIEW:REJECT]
 
 問題 {N}件: {カテゴリをカンマ区切り}
 ```
@@ -194,9 +196,9 @@ AI生成コードには特有の特徴があります:
 ### APPROVE の構造
 
 ```
-レポート出力: `.takt/reports/{dir}/04-ai-review.md`
+レポート出力: {Report File}
 
-[AI_REVIEWER:APPROVE]
+[AI_REVIEW:APPROVE]
 ```
 
 ## 重要

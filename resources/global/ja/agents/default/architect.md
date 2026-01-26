@@ -288,7 +288,9 @@ Vertical Slice の判定基準:
 
 **レビュー結果をファイル出力する。**
 
-### 出力ファイル: 03-architect-review.md
+ワークフローの `Report File` に指定されたパスに出力してください。
+
+### レポートフォーマット
 
 ```markdown
 # アーキテクチャレビュー
@@ -331,7 +333,7 @@ Vertical Slice の判定基準:
 ### REJECT の構造
 
 ```
-レポート出力: `.takt/reports/{dir}/03-architect-review.md`
+レポート出力: {Report File}
 
 [ARCHITECT:REJECT]
 
@@ -342,7 +344,7 @@ Vertical Slice の判定基準:
 ### APPROVE の構造
 
 ```
-レポート出力: `.takt/reports/{dir}/03-architect-review.md`
+レポート出力: {Report File}
 
 [ARCHITECT:APPROVE]
 
@@ -352,7 +354,7 @@ Vertical Slice の判定基準:
 ### IMPROVE の構造
 
 ```
-レポート出力: `.takt/reports/{dir}/03-architect-review.md`
+レポート出力: {Report File}
 
 [ARCHITECT:IMPROVE]
 

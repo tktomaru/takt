@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-TAKT (Task Agent Koordination Tool) is a multi-agent orchestration system for Claude Code and Codex. It enables YAML-based workflow definitions that coordinate multiple AI agents through state machine transitions.
+TAKT (Task Agent Koordination Tool) is a multi-agent orchestration system for Claude Code. It enables YAML-based workflow definitions that coordinate multiple AI agents through state machine transitions.
 
 ## Commands
 
@@ -23,12 +23,13 @@ TAKT (Task Agent Koordination Tool) is a multi-agent orchestration system for Cl
 
 ```
 CLI (cli.ts)
-  → Slash commands (/run-tasks, /switch, /clear, /help)
+  → Slash commands (/run-tasks, /switch, /clear, /help, /config)
   → or executeTask()
     → WorkflowEngine (workflow/engine.ts)
       → runAgent() (agents/runner.ts)
         → callClaude() (claude/client.ts)
-          → executeClaudeQuery() (claude/executor.ts via claude/process.ts)
+          → executeClaudeCli() (claude/process.ts)
+            → ClaudeProcess (claude-agent-sdk)
 ```
 
 ### Key Components
@@ -42,7 +43,11 @@ CLI (cli.ts)
 
 **Agent Runner** (`src/agents/runner.ts`)
 - Resolves agent specs (name or path) to agent configurations
-- Built-in agents with default tools: `coder` (Read/Glob/Grep/Edit/Write/Bash/WebSearch/WebFetch), `architect` (Read/Glob/Grep/WebSearch/WebFetch), `supervisor` (Read/Glob/Grep/Bash/WebSearch/WebFetch)
+- Built-in agents with default tools:
+  - `coder`: Read/Glob/Grep/Edit/Write/Bash/WebSearch/WebFetch
+  - `architect`: Read/Glob/Grep/WebSearch/WebFetch
+  - `supervisor`: Read/Glob/Grep/Bash/WebSearch/WebFetch
+  - `planner`: Read/Glob/Grep/Bash/WebSearch/WebFetch
 - Custom agents via `.takt/agents.yaml` or prompt files (.md)
 - Supports Claude Code agents (`claudeAgent`) and skills (`claudeSkill`)
 
@@ -54,14 +59,14 @@ CLI (cli.ts)
 
 **Configuration** (`src/config/`)
 - `loader.ts` - Custom agent loading from `.takt/agents.yaml`
-- `workflowLoader.ts` - YAML workflow parsing with Zod validation
+- `workflowLoader.ts` - YAML workflow parsing with Zod validation (loads from `~/.takt/workflows/` only)
 - `agentLoader.ts` - Agent prompt file loading
 - `paths.ts` - Directory structure (`.takt/`, `~/.takt/`), session management
 
 ### Data Flow
 
 1. User provides task or slash command → CLI
-2. CLI loads workflow from `.takt/workflow.yaml` (or named workflow)
+2. CLI loads workflow from `~/.takt/workflows/{name}.yaml`
 3. WorkflowEngine starts at `initialStep`
 4. Each step: `buildInstruction()` → `runStep()` → `runAgent()` → `callClaude()` → detect status → `determineNextStep()`
 5. Status patterns (regex in `statusPatterns`) determine next step via `transitions`
@@ -69,38 +74,43 @@ CLI (cli.ts)
 
 ### Status Detection
 
-Agents output status markers (e.g., `[CODER:DONE]`) that are matched against `statusPatterns` in `src/models/schemas.ts`. Common statuses: `done`, `blocked`, `approved`, `rejected`, `in_progress`, `interrupted`.
+Agents output status markers (e.g., `[CODER:DONE]`) that are matched against `GENERIC_STATUS_PATTERNS` in `src/models/schemas.ts`. Common statuses: `done`, `blocked`, `approved`, `rejected`, `improve`, `in_progress`, `interrupted`.
 
-## Project Structure
+## Directory Structure
 
 ```
-.takt/                    # Project config (logs/ is gitignored)
-  workflow.yaml           # Default workflow definition
-  workflows/              # Named workflow files
-  agents.yaml             # Custom agent definitions
+~/.takt/                  # Global user config (created on first run)
+  config.yaml             # Trusted dirs, default workflow, log level, language
+  workflows/              # Workflow YAML files (required location)
   agents/                 # Agent prompt files (.md)
-  prompts/                # Shared prompts
-  logs/                   # Session logs
 
-~/.takt/                  # Global config
-  config.yaml             # Trusted dirs, default workflow, log level
-  workflows/              # Global workflow files
+.takt/                    # Project-level config
+  agents.yaml             # Custom agent definitions
+  tasks/                  # Task files for /run-tasks
+  reports/                # Execution reports (auto-generated)
+  logs/                   # Session logs (gitignored)
+
+resources/                # Bundled defaults (copied to ~/.takt on init)
+  global/
+    en/                   # English agents and workflows
+    ja/                   # Japanese agents and workflows
 ```
 
 ## Workflow YAML Schema
 
 ```yaml
 name: workflow-name
-max_iterations: 10        # Note: snake_case in YAML
-initial_step: first-step
+description: Optional description
+max_iterations: 10        # snake_case in YAML
 
 steps:
   - name: step-name
-    agent: coder              # Built-in agent name
-    # or agent_path: ./agents/custom.md  # Custom prompt file
+    agent: ~/.takt/agents/default/coder.md  # Path to agent prompt
+    agent_name: coder                       # Display name (optional)
     instruction_template: |
       {task}
-      {previous_output}
+      {previous_response}
+    pass_previous_response: true            # Default: true
     transitions:
       - condition: done
         next_step: next-step
@@ -109,18 +119,25 @@ steps:
     on_no_status: complete    # complete|continue|stay
 ```
 
+### Template Variables
+
+| Variable | Description |
+|----------|-------------|
+| `{task}` | Original user request |
+| `{iteration}` | Current iteration number |
+| `{max_iterations}` | Maximum iterations |
+| `{previous_response}` | Previous step output (requires `pass_previous_response: true`) |
+| `{user_inputs}` | Accumulated user inputs during workflow |
+| `{git_diff}` | Current git diff (uncommitted changes) |
+| `{report_dir}` | Report directory name (e.g., `20250126-143052-task-summary`) |
+
 ## TypeScript Notes
 
 - ESM modules with `.js` extensions in imports
 - Strict TypeScript with `noUncheckedIndexedAccess`
-- Zod schemas for runtime validation (`src/models/schemas.ts`)
+- Zod schemas (v4 syntax) for runtime validation (`src/models/schemas.ts`)
 - Uses `@anthropic-ai/claude-agent-sdk` for Claude integration
-- Simple CLI prompts in `src/prompt/` for user interaction
 
-## Command Design Principles
+## Design Principles
 
-**Keep commands minimal.** Avoid proliferating commands. One command per concept.
-
-- Use a single command with arguments/modes instead of multiple similar commands
-- Example: `/config` opens permission mode selection. No need for `/sacrifice`, `/safe`, `/confirm`, etc.
-- Before adding a new command, consider if existing commands can be extended
+**Keep commands minimal.** One command per concept. Use arguments/modes instead of multiple similar commands. Before adding a new command, consider if existing commands can be extended.

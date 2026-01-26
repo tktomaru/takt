@@ -14,8 +14,9 @@ steps:
     instruction_template: |
       ## Workflow Context
       - Iteration: {iteration}/{max_iterations}
-      - Step: plan (Task analysis)
+      - Step: plan (Task Analysis)
       - Report Directory: .takt/reports/{report_dir}/
+      - Report File: .takt/reports/{report_dir}/00-plan.md
 
       ## User Request
       {task}
@@ -34,7 +35,31 @@ steps:
       2. Identify impact scope
       3. Decide implementation approach
 
-      **Report output:** `.takt/reports/{report_dir}/00-plan.md`
+      **Report output:** Output to the `Report File` specified above.
+      - If file does not exist: Create new file
+      - If file exists: Append with `## Iteration {iteration}` section
+
+      **Report format:**
+      ```markdown
+      # Task Plan
+
+      ## Original Request
+      {User's request as-is}
+
+      ## Analysis Results
+
+      ### Objective
+      {What needs to be achieved}
+
+      ### Scope
+      {Impact scope}
+
+      ### Implementation Approach
+      {How to proceed}
+
+      ## Clarifications Needed (if any)
+      - {Unclear points or items requiring confirmation}
+      ```
 
       Output [PLANNER:DONE] when complete.
       Output [PLANNER:BLOCKED] if requirements are unclear.
@@ -52,6 +77,9 @@ steps:
       - Iteration: {iteration}/{max_iterations}
       - Step: implement
       - Report Directory: .takt/reports/{report_dir}/
+      - Report Files:
+        - Scope: .takt/reports/{report_dir}/01-coder-scope.md
+        - Decisions: .takt/reports/{report_dir}/02-coder-decisions.md
 
       ## User Request
       {task}
@@ -62,6 +90,40 @@ steps:
       ## Instructions
       Follow the plan from the plan step and implement.
       Refer to the plan report (00-plan.md) and proceed with implementation.
+
+      **Report output:** Output to the `Report Files` specified above.
+      - If file does not exist: Create new file
+      - If file exists: Append with `## Iteration {iteration}` section
+
+      **Scope report format (create at implementation start):**
+      ```markdown
+      # Change Scope Declaration
+
+      ## Task
+      {One-line task summary}
+
+      ## Planned Changes
+      | Type | File |
+      |------|------|
+      | Create | `src/example.ts` |
+      | Modify | `src/routes.ts` |
+
+      ## Estimated Size
+      Small / Medium / Large
+
+      ## Impact Scope
+      - {Affected modules or features}
+      ```
+
+      **Decisions report format (on completion, only if decisions were made):**
+      ```markdown
+      # Decision Log
+
+      ## 1. {Decision Content}
+      - **Background**: {Why the decision was needed}
+      - **Options Considered**: {List of options}
+      - **Reason**: {Why this option was chosen}
+      ```
 
       Include [CODER:DONE] when complete.
       Include [CODER:BLOCKED] if you cannot proceed (returns to plan).
@@ -78,6 +140,7 @@ steps:
       - Iteration: {iteration}/{max_iterations}
       - Step: review (Architecture Review)
       - Report Directory: .takt/reports/{report_dir}/
+      - Report File: .takt/reports/{report_dir}/03-architect-review.md
 
       ## Original User Request (Initial request from workflow start)
       {task}
@@ -95,7 +158,37 @@ steps:
       - [ARCHITECT:IMPROVE] if minor improvements needed
       - [ARCHITECT:REJECT] if structural changes are needed (list specific issues)
 
-      Output report to the Report Directory above.
+      **Report output:** Output to the `Report File` specified above.
+      - If file does not exist: Create new file
+      - If file exists: Append with `## Iteration {iteration}` section
+
+      **Report format:**
+      ```markdown
+      # Architecture Review
+
+      ## Result: APPROVE / IMPROVE / REJECT
+
+      ## Summary
+      {1-2 sentences summarizing result}
+
+      ## Reviewed Perspectives
+      - [x] Structure & Design
+      - [x] Code Quality
+      - [x] Change Scope
+
+      ## Issues (if REJECT)
+      | # | Location | Issue | Fix |
+      |---|----------|-------|-----|
+      | 1 | `src/file.ts:42` | Issue description | Fix method |
+
+      ## Improvement Suggestions (optional, non-blocking)
+      - {Future improvement suggestions}
+      ```
+
+      **Cognitive load reduction rules:**
+      - APPROVE + no issues → Summary only (5 lines or less)
+      - APPROVE + minor suggestions → Summary + suggestions (15 lines or less)
+      - REJECT → Issues in table format (30 lines or less)
     transitions:
       - condition: approved
         next_step: ai_review
@@ -146,6 +239,7 @@ steps:
       - Iteration: {iteration}/{max_iterations}
       - Step: ai_review (AI-Generated Code Review)
       - Report Directory: .takt/reports/{report_dir}/
+      - Report File: .takt/reports/{report_dir}/04-ai-review.md
 
       ## Original User Request (Initial request from workflow start)
       {task}
@@ -166,7 +260,36 @@ steps:
       - [AI_REVIEW:APPROVE] if no AI-specific issues found
       - [AI_REVIEW:REJECT] if issues detected (list specific problems)
 
-      Output report to the Report Directory above.
+      **Report output:** Output to the `Report File` specified above.
+      - If file does not exist: Create new file
+      - If file exists: Append with `## Iteration {iteration}` section
+
+      **Report format:**
+      ```markdown
+      # AI-Generated Code Review
+
+      ## Result: APPROVE / REJECT
+
+      ## Summary
+      {One sentence summarizing result}
+
+      ## Verified Items
+      | Aspect | Result | Notes |
+      |--------|--------|-------|
+      | Assumption validity | ✅ | - |
+      | API/Library existence | ✅ | - |
+      | Context fit | ✅ | - |
+      | Scope | ✅ | - |
+
+      ## Issues (if REJECT)
+      | # | Category | Location | Issue |
+      |---|----------|----------|-------|
+      | 1 | Hallucinated API | `src/file.ts:23` | Non-existent method |
+      ```
+
+      **Cognitive load reduction rules:**
+      - No issues → Summary 1 line + check table only (10 lines or less)
+      - Issues found → + Issues in table format (25 lines or less)
     transitions:
       - condition: approved
         next_step: security_review
@@ -213,6 +336,7 @@ steps:
       - Iteration: {iteration}/{max_iterations}
       - Step: security_review
       - Report Directory: .takt/reports/{report_dir}/
+      - Report File: .takt/reports/{report_dir}/05-security-review.md
 
       ## Original User Request (Initial request from workflow start)
       {task}
@@ -233,7 +357,39 @@ steps:
       - [SECURITY:APPROVE] if no security issues found
       - [SECURITY:REJECT] if vulnerabilities detected (list specific issues)
 
-      Output report to the Report Directory above.
+      **Report output:** Output to the `Report File` specified above.
+      - If file does not exist: Create new file
+      - If file exists: Append with `## Iteration {iteration}` section
+
+      **Report format:**
+      ```markdown
+      # Security Review
+
+      ## Result: APPROVE / REJECT
+
+      ## Severity: None / Low / Medium / High / Critical
+
+      ## Check Results
+      | Category | Result | Notes |
+      |----------|--------|-------|
+      | Injection | ✅ | - |
+      | Auth/Authz | ✅ | - |
+      | Data Protection | ✅ | - |
+      | Dependencies | ✅ | - |
+
+      ## Vulnerabilities (if REJECT)
+      | # | Severity | Type | Location | Fix |
+      |---|----------|------|----------|-----|
+      | 1 | High | SQLi | `src/db.ts:42` | Use parameterized query |
+
+      ## Warnings (non-blocking)
+      - {Security recommendations}
+      ```
+
+      **Cognitive load reduction rules:**
+      - No issues → Check table only (10 lines or less)
+      - Warnings → + Warnings 1-2 lines (15 lines or less)
+      - Vulnerabilities → + Table format (30 lines or less)
     transitions:
       - condition: approved
         next_step: supervise
@@ -306,6 +462,9 @@ steps:
       - Iteration: {iteration}/{max_iterations}
       - Step: supervise (final verification)
       - Report Directory: .takt/reports/{report_dir}/
+      - Report Files:
+        - Validation: .takt/reports/{report_dir}/06-supervisor-validation.md
+        - Summary: .takt/reports/{report_dir}/summary.md
 
       ## Original User Request
       {task}
@@ -326,6 +485,64 @@ steps:
       **Review Reports:** Read all reports in Report Directory and
       check for any unaddressed improvement suggestions.
 
+      **Report output:** Output to the `Report Files` specified above.
+      - If file does not exist: Create new file
+      - If file exists: Append with `## Iteration {iteration}` section
+
+      **Validation report format:**
+      ```markdown
+      # Final Validation Results
+
+      ## Result: APPROVE / REJECT
+
+      ## Validation Summary
+      | Item | Status | Verification Method |
+      |------|--------|---------------------|
+      | Requirements met | ✅ | Matched against requirements list |
+      | Tests | ✅ | `npm test` (N passed) |
+      | Build | ✅ | `npm run build` succeeded |
+      | Functional check | ✅ | Main flows verified |
+
+      ## Deliverables
+      - Created: {Created files}
+      - Modified: {Modified files}
+
+      ## Incomplete Items (if REJECT)
+      | # | Item | Reason |
+      |---|------|--------|
+      | 1 | {Item} | {Reason} |
+      ```
+
+      **Summary report format (only if APPROVE):**
+      ```markdown
+      # Task Completion Summary
+
+      ## Task
+      {Original request in 1-2 sentences}
+
+      ## Result
+      ✅ Complete
+
+      ## Changes
+      | Type | File | Summary |
+      |------|------|---------|
+      | Create | `src/file.ts` | Summary description |
+
+      ## Review Results
+      | Review | Result |
+      |--------|--------|
+      | Architect | ✅ APPROVE |
+      | AI Review | ✅ APPROVE |
+      | Security | ✅ APPROVE |
+      | Supervisor | ✅ APPROVE |
+
+      ## Verification Commands
+      ```bash
+      npm test
+      npm run build
+      ```
+      ```
+
       Output:
       - [SUPERVISOR:APPROVE] if ready to merge
       - [SUPERVISOR:REJECT] if issues found (specify the issues)
@@ -333,4 +550,4 @@ steps:
       - condition: approved
         next_step: COMPLETE
       - condition: rejected
-        next_step: fix
+        next_step: plan

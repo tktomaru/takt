@@ -30,6 +30,7 @@ export function matchesCondition(
     blocked: ['blocked'],
     approved: ['approved'],
     rejected: ['rejected'],
+    improve: ['improve'],
     pending: [],
     in_progress: [],
     cancelled: [],

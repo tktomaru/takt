@@ -3,6 +3,8 @@
  */
 
 import { EventEmitter } from 'node:events';
+import { mkdirSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 import type {
   WorkflowConfig,
   WorkflowState,
@@ -73,8 +75,17 @@ export class WorkflowEngine extends EventEmitter {
     this.options = options;
     this.loopDetector = new LoopDetector(config.loopDetection);
     this.reportDir = generateReportDir(task);
+    this.ensureReportDirExists();
     this.validateConfig();
     this.state = createInitialState(config, options);
+  }
+
+  /** Ensure report directory exists */
+  private ensureReportDirExists(): void {
+    const reportDirPath = join(this.cwd, '.takt', 'reports', this.reportDir);
+    if (!existsSync(reportDirPath)) {
+      mkdirSync(reportDirPath, { recursive: true });
+    }
   }
 
   /** Validate workflow configuration at construction time */

@@ -43,7 +43,9 @@
 
 ## レポート出力
 
-### 出力ファイル: 00-plan.md
+ワークフローの `Report File` に指定されたパスに出力してください。
+
+### レポートフォーマット
 
 ```markdown
 # タスク計画
@@ -83,7 +85,7 @@
 ### DONE時の出力構造
 
 ```
-レポート出力: `.takt/reports/{dir}/00-plan.md`
+レポート出力: {Report File}
 
 [PLANNER:DONE]
 

@@ -148,9 +148,11 @@ Architectが「正しく作られているか（Verification）」を確認す�
 
 **最終検証結果とサマリーをファイル出力する。**
 
+ワークフローの `Report Files` に指定されたパスに出力してください。
+
 ### 出力ファイル
 
-#### 1. 検証結果（06-supervisor-validation.md）
+#### 1. 検証結果（ワークフローの `Validation` パスに出力）
 
 ```markdown
 # 最終検証結果
@@ -175,7 +177,7 @@ Architectが「正しく作られているか（Verification）」を確認す�
 | 1 | ログアウト機能 | 未実装 |
 ```
 
-#### 2. 人間レビュワー向けサマリー（summary.md）
+#### 2. 人間レビュワー向けサマリー（ワークフローの `Summary` パスに出力）
 
 **APPROVEの場合のみ作成。人間が最終確認するための要約。**
 
@@ -224,8 +226,8 @@ npm run build
 
 ```
 レポート出力:
-- `.takt/reports/{dir}/06-supervisor-validation.md`
-- `.takt/reports/{dir}/summary.md`
+- {Validation パス}
+- {Summary パス}
 
 [SUPERVISOR:APPROVE]
 
@@ -235,7 +237,7 @@ npm run build
 ### REJECT の構造
 
 ```
-レポート出力: `.takt/reports/{dir}/06-supervisor-validation.md`
+レポート出力: {Validation パス}
 
 [SUPERVISOR:REJECT]
 

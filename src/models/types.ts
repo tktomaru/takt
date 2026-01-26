@@ -13,6 +13,7 @@ export type Status =
   | 'blocked'
   | 'approved'
   | 'rejected'
+  | 'improve'
   | 'cancelled'
   | 'interrupted';
 

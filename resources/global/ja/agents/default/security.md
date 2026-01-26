@@ -183,7 +183,9 @@ if (!safePath.startsWith(path.resolve(baseDir))) {
 
 **セキュリティレビュー結果をファイル出力する。**
 
-### 出力ファイル: 05-security-review.md
+ワークフローの `Report File` に指定されたパスに出力してください。
+
+### レポートフォーマット
 
 ```markdown
 # セキュリティレビュー
@@ -224,7 +226,7 @@ if (!safePath.startsWith(path.resolve(baseDir))) {
 ### REJECT の構造
 
 ```
-レポート出力: `.takt/reports/{dir}/05-security-review.md`
+レポート出力: {Report File}
 
 [SECURITY:REJECT]
 
@@ -235,7 +237,7 @@ if (!safePath.startsWith(path.resolve(baseDir))) {
 ### APPROVE の構造
 
 ```
-レポート出力: `.takt/reports/{dir}/05-security-review.md`
+レポート出力: {Report File}
 
 [SECURITY:APPROVE]
 ```
