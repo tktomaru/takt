@@ -2,9 +2,9 @@
 # CQRS+ES、フロントエンド、セキュリティ、QAの専門家によるレビューワークフロー
 #
 # フロー:
-# implement -> cqrs_es_review -> frontend_review -> security_review -> qa_review -> supervise -> COMPLETE
-#                 ↓                  ↓                   ↓                ↓            ↓
-#            fix_cqrs_es       fix_frontend         fix_security     fix_qa     fix_supervisor
+# plan -> implement -> cqrs_es_review -> frontend_review -> ai_review -> security_review -> qa_review -> supervise -> COMPLETE
+#                          ↓                  ↓                 ↓              ↓                ↓            ↓
+#                     fix_cqrs_es       fix_frontend        ai_fix       fix_security       fix_qa    fix_supervisor
 #
 # 修正時の戻り先はCoderが判断:
 # - fix_security: MINOR→security_review, MAJOR→cqrs_es_review
@@ -15,38 +15,141 @@ description: CQRS+ES・フロントエンド・セキュリティ・QA専門家�
 
 max_iterations: 20
 
+initial_step: plan
+
 steps:
+  # ===========================================
+  # Phase 0: Planning
+  # ===========================================
+  - name: plan
+    agent: ~/.takt/agents/default/planner.md
+    instruction_template: |
+      ## Workflow Context
+      - Iteration: {iteration}/{max_iterations}
+      - Step: plan (タスク分析)
+      - Report Directory: .takt/reports/{report_dir}/
+      - Report File: .takt/reports/{report_dir}/00-plan.md
+
+      ## User Request
+      {task}
+
+      ## Previous Response (implementからの差し戻し時)
+      {previous_response}
+
+      ## Instructions
+      タスクを分析し、実装方針を立ててください。
+
+      **注意:** Previous Responseがある場合は差し戻しのため、
+      その内容を踏まえて計画を見直してください（replan）。
+
+      **やること:**
+      1. タスクの要件を理解する
+      2. 影響範囲を特定する
+      3. 実装アプローチを決める
+
+      **レポート出力:** 上記の `Report File` に出力してください。
+      - ファイルが存在しない場合: 新規作成
+      - ファイルが存在する場合: `## Iteration {iteration}` セクションを追記
+
+      **レポートフォーマット:**
+      ```markdown
+      # タスク計画
+
+      ## 元の要求
+      {ユーザーの要求をそのまま記載}
+
+      ## 分析結果
+
+      ### 目的
+      {達成すべきこと}
+
+      ### スコープ
+      {影響範囲}
+
+      ### 実装アプローチ
+      {どう進めるか}
+
+      ## 確認事項（あれば）
+      - {不明点や確認が必要な点}
+      ```
+
+      完了したら [PLANNER:DONE] を出力。
+      要件が不明確な場合は [PLANNER:BLOCKED] を出力。
+    pass_previous_response: true
+    transitions:
+      - condition: done
+        next_step: implement
+      - condition: blocked
+        next_step: ABORT
+
+  # ===========================================
+  # Phase 1: Implementation
+  # ===========================================
   - name: implement
     agent: ~/.takt/agents/default/coder.md
     instruction_template: |
       ## Workflow Context
       - Iteration: {iteration}/{max_iterations}
       - Step: implement
+      - Report Directory: .takt/reports/{report_dir}/
+      - Report Files:
+        - Scope: .takt/reports/{report_dir}/01-coder-scope.md
+        - Decisions: .takt/reports/{report_dir}/02-coder-decisions.md
 
-      ## Original User Request (これは最新の指示ではなく、ワークフロー開始時の元の要求です)
+      ## User Request
       {task}
 
-      ## Additional User Inputs (ワークフロー中に追加された情報)
+      ## Additional User Inputs
       {user_inputs}
 
       ## Instructions
-      **重要**: 上記の「Original User Request」はワークフロー開始時の元の要求です。
-      イテレーション2回目以降の場合、すでにリサーチや調査は完了しているはずです。
-      セッションの会話履歴を確認し、前回の作業の続きから進めてください。
+      planステップで立てた計画に従って実装してください。
+      計画レポート（00-plan.md）を参照し、実装を進めてください。
 
-      - イテレーション1: 要求を理解し、必要ならリサーチを行う
-      - イテレーション2以降: 前回の作業結果を踏まえて実装を進める
+      **レポート出力:** 上記の `Report Files` に出力してください。
+      - ファイルが存在しない場合: 新規作成
+      - ファイルが存在する場合: `## Iteration {iteration}` セクションを追記
+
+      **Scopeレポートフォーマット（実装開始時に作成）:**
+      ```markdown
+      # 変更スコープ宣言
+
+      ## タスク
+      {タスクの1行要約}
+
+      ## 変更予定
+      | 種別 | ファイル |
+      |------|---------|
+      | 作成 | `src/example.ts` |
+      | 変更 | `src/routes.ts` |
+
+      ## 推定規模
+      Small / Medium / Large
+
+      ## 影響範囲
+      - {影響するモジュールや機能}
+      ```
+
+      **Decisionsレポートフォーマット（実装完了時、決定がある場合のみ）:**
+      ```markdown
+      # 決定ログ
+
+      ## 1. {決定内容}
+      - **背景**: {なぜ決定が必要だったか}
+      - **検討した選択肢**: {選択肢リスト}
+      - **理由**: {選んだ理由}
+      ```
 
       完了時は [CODER:DONE] を含めてください。
-      進行できない場合は [CODER:BLOCKED] を含めてください。
+      進行できない場合は [CODER:BLOCKED] を出力し、planに戻ります。
     transitions:
       - condition: done
         next_step: cqrs_es_review
       - condition: blocked
-        next_step: implement
+        next_step: plan
 
   # ===========================================
-  # Phase 1: CQRS+ES Review
+  # Phase 2: CQRS+ES Review
   # ===========================================
   - name: cqrs_es_review
     agent: ~/.takt/agents/expert-review/cqrs-es-reviewer.md
@@ -54,6 +157,8 @@ steps:
       ## Workflow Context
       - Iteration: {iteration}/{max_iterations}
       - Step: cqrs_es_review (CQRS+ES専門レビュー)
+      - Report Directory: .takt/reports/{report_dir}/
+      - Report File: .takt/reports/{report_dir}/03-cqrs-es-review.md
 
       ## Original User Request
       {task}
@@ -76,6 +181,34 @@ steps:
 
       **注意**: このプロジェクトがCQRS+ESパターンを使用していない場合は、
       一般的なドメイン設計の観点からレビューしてください。
+
+      **レポート出力:** 上記の `Report File` に出力してください。
+      - ファイルが存在しない場合: 新規作成
+      - ファイルが存在する場合: `## Iteration {iteration}` セクションを追記
+
+      **レポートフォーマット:**
+      ```markdown
+      # CQRS+ESレビュー
+
+      ## 結果: APPROVE / REJECT
+
+      ## サマリー
+      {1-2文で結果を要約}
+
+      ## 確認した観点
+      | 観点 | 結果 | 備考 |
+      |------|------|------|
+      | Aggregate設計 | ✅ | - |
+      | イベント設計 | ✅ | - |
+      | Command/Query分離 | ✅ | - |
+      | プロジェクション | ✅ | - |
+      | 結果整合性 | ✅ | - |
+
+      ## 問題点（REJECTの場合）
+      | # | 場所 | 問題 | 修正案 |
+      |---|------|------|--------|
+      | 1 | `src/file.ts:42` | 問題の説明 | 修正方法 |
+      ```
 
       Include:
       - [CQRS-ES:APPROVE] if CQRS+ES design is sound
@@ -119,10 +252,10 @@ steps:
       - condition: done
         next_step: cqrs_es_review
       - condition: blocked
-        next_step: fix_cqrs_es
+        next_step: plan
 
   # ===========================================
-  # Phase 2: Frontend Review
+  # Phase 3: Frontend Review
   # ===========================================
   - name: frontend_review
     agent: ~/.takt/agents/expert-review/frontend-reviewer.md
@@ -130,6 +263,8 @@ steps:
       ## Workflow Context
       - Iteration: {iteration}/{max_iterations}
       - Step: frontend_review (フロントエンド専門レビュー)
+      - Report Directory: .takt/reports/{report_dir}/
+      - Report File: .takt/reports/{report_dir}/04-frontend-review.md
 
       ## Original User Request
       {task}
@@ -153,12 +288,40 @@ steps:
       **注意**: このプロジェクトがフロントエンドを含まない場合は、
       [FRONTEND:APPROVE] として次に進んでください。
 
+      **レポート出力:** 上記の `Report File` に出力してください。
+      - ファイルが存在しない場合: 新規作成
+      - ファイルが存在する場合: `## Iteration {iteration}` セクションを追記
+
+      **レポートフォーマット:**
+      ```markdown
+      # フロントエンドレビュー
+
+      ## 結果: APPROVE / REJECT
+
+      ## サマリー
+      {1-2文で結果を要約}
+
+      ## 確認した観点
+      | 観点 | 結果 | 備考 |
+      |------|------|------|
+      | コンポーネント設計 | ✅ | - |
+      | 状態管理 | ✅ | - |
+      | パフォーマンス | ✅ | - |
+      | アクセシビリティ | ✅ | - |
+      | 型安全性 | ✅ | - |
+
+      ## 問題点（REJECTの場合）
+      | # | 場所 | 問題 | 修正案 |
+      |---|------|------|--------|
+      | 1 | `src/file.tsx:42` | 問題の説明 | 修正方法 |
+      ```
+
       Include:
       - [FRONTEND:APPROVE] if frontend design is sound
       - [FRONTEND:REJECT] if design issues found (list specific issues)
     transitions:
       - condition: approved
-        next_step: security_review
+        next_step: ai_review
       - condition: rejected
         next_step: fix_frontend
 
@@ -195,10 +358,110 @@ steps:
       - condition: done
         next_step: frontend_review
       - condition: blocked
-        next_step: fix_frontend
+        next_step: plan
 
   # ===========================================
-  # Phase 3: Security Review
+  # Phase 4: AI Review
+  # ===========================================
+  - name: ai_review
+    agent: ~/.takt/agents/default/ai-reviewer.md
+    instruction_template: |
+      ## Workflow Context
+      - Iteration: {iteration}/{max_iterations}
+      - Step: ai_review (AI生成コードレビュー)
+      - Report Directory: .takt/reports/{report_dir}/
+      - Report File: .takt/reports/{report_dir}/05-ai-review.md
+
+      ## Original User Request (ワークフロー開始時の元の要求)
+      {task}
+
+      ## Git Diff
+      ```diff
+      {git_diff}
+      ```
+
+      ## Instructions
+      AI特有の問題についてコードをレビューしてください:
+      - 仮定の検証
+      - もっともらしいが間違っているパターン
+      - 既存コードベースとの適合性
+      - スコープクリープの検出
+
+      **レポート出力:** 上記の `Report File` に出力してください。
+      - ファイルが存在しない場合: 新規作成
+      - ファイルが存在する場合: `## Iteration {iteration}` セクションを追記
+
+      **レポートフォーマット:**
+      ```markdown
+      # AI生成コードレビュー
+
+      ## 結果: APPROVE / REJECT
+
+      ## サマリー
+      {1文で結果を要約}
+
+      ## 検証した項目
+      | 観点 | 結果 | 備考 |
+      |------|------|------|
+      | 仮定の妥当性 | ✅ | - |
+      | API/ライブラリの実在 | ✅ | - |
+      | コンテキスト適合 | ✅ | - |
+      | スコープ | ✅ | - |
+
+      ## 問題点（REJECTの場合）
+      | # | カテゴリ | 場所 | 問題 |
+      |---|---------|------|------|
+      | 1 | 幻覚API | `src/file.ts:23` | 存在しないメソッド |
+      ```
+
+      **認知負荷軽減ルール:**
+      - 問題なし → サマリー1文 + チェック表のみ（10行以内）
+      - 問題あり → + 問題を表形式で（25行以内）
+
+      以下を含めてください:
+      - [AI_REVIEW:APPROVE] AI特有の問題が見つからない場合
+      - [AI_REVIEW:REJECT] 問題が検出された場合（具体的な問題をリスト）
+    transitions:
+      - condition: approved
+        next_step: security_review
+      - condition: rejected
+        next_step: ai_fix
+
+  - name: ai_fix
+    agent: ~/.takt/agents/default/coder.md
+    instruction_template: |
+      ## Workflow Context
+      - Iteration: {iteration}/{max_iterations}
+      - Step: ai_fix
+
+      ## AI Review Feedback (これが最新の指示です - 優先して対応してください)
+      {previous_response}
+
+      ## Original User Request (ワークフロー開始時の元の要求 - 参考情報)
+      {task}
+
+      ## Additional User Inputs
+      {user_inputs}
+
+      ## Instructions
+      **重要**: AI Reviewerのフィードバックに対応してください。
+      以下に集中してください:
+      - 間違った仮定の修正
+      - もっともらしいが間違っている実装の修正
+      - 既存コードベースのパターンとの整合
+      - スコープクリープの除去
+
+      完了時は [CODER:DONE] を含めてください。
+      進行できない場合は [CODER:BLOCKED] を含めてください。
+    pass_previous_response: true
+    transitions:
+      - condition: done
+        next_step: cqrs_es_review
+      - condition: blocked
+        next_step: plan
+
+  # ===========================================
+  # Phase 5: Security Review
   # ===========================================
   - name: security_review
     agent: ~/.takt/agents/expert-review/security-reviewer.md
@@ -206,6 +469,8 @@ steps:
       ## Workflow Context
       - Iteration: {iteration}/{max_iterations}
       - Step: security_review (セキュリティ専門レビュー)
+      - Report Directory: .takt/reports/{report_dir}/
+      - Report File: .takt/reports/{report_dir}/06-security-review.md
 
       ## Original User Request
       {task}
@@ -224,6 +489,35 @@ steps:
       - 機密情報の取り扱い
       - 暗号化の適切性
       - OWASP Top 10
+
+      **レポート出力:** 上記の `Report File` に出力してください。
+      - ファイルが存在しない場合: 新規作成
+      - ファイルが存在する場合: `## Iteration {iteration}` セクションを追記
+
+      **レポートフォーマット:**
+      ```markdown
+      # セキュリティレビュー
+
+      ## 結果: APPROVE / REJECT
+
+      ## 重大度: None / Low / Medium / High / Critical
+
+      ## チェック結果
+      | カテゴリ | 結果 | 備考 |
+      |---------|------|------|
+      | インジェクション | ✅ | - |
+      | 認証・認可 | ✅ | - |
+      | データ保護 | ✅ | - |
+      | 依存関係 | ✅ | - |
+
+      ## 脆弱性（REJECTの場合）
+      | # | 重大度 | 種類 | 場所 | 修正案 |
+      |---|--------|------|------|--------|
+      | 1 | High | SQLi | `src/db.ts:42` | パラメータ化クエリを使用 |
+
+      ## 警告（ブロッキングではない）
+      - {セキュリティに関する推奨事項}
+      ```
 
       Include:
       - [SECURITY:APPROVE] if no security issues found
@@ -276,10 +570,10 @@ steps:
       - condition: major
         next_step: cqrs_es_review
       - condition: blocked
-        next_step: fix_security
+        next_step: plan
 
   # ===========================================
-  # Phase 4: QA Review
+  # Phase 6: QA Review
   # ===========================================
   - name: qa_review
     agent: ~/.takt/agents/expert-review/qa-reviewer.md
@@ -287,6 +581,8 @@ steps:
       ## Workflow Context
       - Iteration: {iteration}/{max_iterations}
       - Step: qa_review (QA専門レビュー)
+      - Report Directory: .takt/reports/{report_dir}/
+      - Report File: .takt/reports/{report_dir}/07-qa-review.md
 
       ## Original User Request
       {task}
@@ -306,6 +602,34 @@ steps:
       - エラーハンドリング
       - ログとモニタリング
       - 保守性
+
+      **レポート出力:** 上記の `Report File` に出力してください。
+      - ファイルが存在しない場合: 新規作成
+      - ファイルが存在する場合: `## Iteration {iteration}` セクションを追記
+
+      **レポートフォーマット:**
+      ```markdown
+      # QAレビュー
+
+      ## 結果: APPROVE / REJECT
+
+      ## サマリー
+      {1-2文で結果を要約}
+
+      ## 確認した観点
+      | 観点 | 結果 | 備考 |
+      |------|------|------|
+      | テストカバレッジ | ✅ | - |
+      | テスト品質 | ✅ | - |
+      | エラーハンドリング | ✅ | - |
+      | ドキュメント | ✅ | - |
+      | 保守性 | ✅ | - |
+
+      ## 問題点（REJECTの場合）
+      | # | カテゴリ | 問題 | 修正案 |
+      |---|---------|------|--------|
+      | 1 | テスト | 問題の説明 | 修正方法 |
+      ```
 
       Include:
       - [QA:APPROVE] if quality standards are met
@@ -362,10 +686,10 @@ steps:
       - condition: major
         next_step: cqrs_es_review
       - condition: blocked
-        next_step: fix_qa
+        next_step: plan
 
   # ===========================================
-  # Phase 5: Supervision
+  # Phase 7: Supervision
   # ===========================================
   - name: supervise
     agent: ~/.takt/agents/expert-review/supervisor.md
@@ -373,6 +697,10 @@ steps:
       ## Workflow Context
       - Iteration: {iteration}/{max_iterations}
       - Step: supervise (最終確認)
+      - Report Directory: .takt/reports/{report_dir}/
+      - Report Files:
+        - Validation: .takt/reports/{report_dir}/08-supervisor-validation.md
+        - Summary: .takt/reports/{report_dir}/summary.md
 
       ## Original User Request
       {task}
@@ -386,21 +714,84 @@ steps:
       このステップに到達したということは、以下のレビューがすべてAPPROVEされています：
       - CQRS+ES Review: APPROVED
       - Frontend Review: APPROVED
+      - AI Review: APPROVED
       - Security Review: APPROVED
       - QA Review: APPROVED
 
       ## Instructions
-      監督者として、すべてのレビュー結果を統括し、最終判断を下してください。
+      テスト実行、ビルド確認、最終承認を行ってください。
 
-      **確認観点:**
-      - 各レビュー結果に矛盾がないか
-      - 元の要求が満たされているか
-      - 全体として整合性が取れているか
-      - リリースに値する品質か
+      **ワークフロー全体の確認:**
+      1. 計画（00-plan.md）と実装結果が一致しているか
+      2. 各レビューステップの指摘が対応されているか
+      3. 元のタスク目的が達成されているか
 
-      Include:
-      - [SUPERVISOR:APPROVE] if ready for release
-      - [SUPERVISOR:REJECT] if additional work needed (list specific items)
+      **レポートの確認:** Report Directory内の全レポートを読み、
+      未対応の改善提案がないか確認してください。
+
+      **レポート出力:** 上記の `Report Files` に出力してください。
+      - ファイルが存在しない場合: 新規作成
+      - ファイルが存在する場合: `## Iteration {iteration}` セクションを追記
+
+      **Validationレポートフォーマット:**
+      ```markdown
+      # 最終検証結果
+
+      ## 結果: APPROVE / REJECT
+
+      ## 検証サマリー
+      | 項目 | 状態 | 確認方法 |
+      |------|------|---------|
+      | 要求充足 | ✅ | 要求リストと照合 |
+      | テスト | ✅ | `npm test` (N passed) |
+      | ビルド | ✅ | `npm run build` 成功 |
+      | 動作確認 | ✅ | 主要フロー確認 |
+
+      ## 成果物
+      - 作成: {作成したファイル}
+      - 変更: {変更したファイル}
+
+      ## 未完了項目（REJECTの場合）
+      | # | 項目 | 理由 |
+      |---|------|------|
+      | 1 | {項目} | {理由} |
+      ```
+
+      **Summaryレポートフォーマット（APPROVEの場合のみ）:**
+      ```markdown
+      # タスク完了サマリー
+
+      ## タスク
+      {元の要求を1-2文で}
+
+      ## 結果
+      ✅ 完了
+
+      ## 変更内容
+      | 種別 | ファイル | 概要 |
+      |------|---------|------|
+      | 作成 | `src/file.ts` | 概要説明 |
+
+      ## レビュー結果
+      | レビュー | 結果 |
+      |---------|------|
+      | CQRS+ES | ✅ APPROVE |
+      | Frontend | ✅ APPROVE |
+      | AI Review | ✅ APPROVE |
+      | Security | ✅ APPROVE |
+      | QA | ✅ APPROVE |
+      | Supervisor | ✅ APPROVE |
+
+      ## 確認コマンド
+      ```bash
+      npm test
+      npm run build
+      ```
+      ```
+
+      出力:
+      - [SUPERVISOR:APPROVE] すべて完了、マージ可能
+      - [SUPERVISOR:REJECT] 問題あり（具体的な問題を記載）
     transitions:
       - condition: approved
         next_step: COMPLETE
@@ -436,6 +827,4 @@ steps:
       - condition: done
         next_step: supervise
       - condition: blocked
-        next_step: fix_supervisor
-
-initial_step: implement
+        next_step: plan
