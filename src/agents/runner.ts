@@ -6,17 +6,15 @@ import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, dirname } from 'node:path';
 import {
-  callClaude,
-  callClaudeCustom,
   callClaudeAgent,
   callClaudeSkill,
-  ClaudeCallOptions,
+  type ClaudeCallOptions,
 } from '../claude/client.js';
 import { type StreamCallback, type PermissionHandler, type AskUserQuestionHandler } from '../claude/process.js';
-import { callCodex, callCodexCustom, type CodexCallOptions } from '../codex/client.js';
 import { loadCustomAgents, loadAgentPrompt } from '../config/loader.js';
 import { loadGlobalConfig } from '../config/globalConfig.js';
 import { loadProjectConfig } from '../config/projectConfig.js';
+import { getProvider, type ProviderType, type ProviderCallOptions } from '../providers/index.js';
 import type { AgentResponse, CustomAgentConfig } from '../models/types.js';
 
 export type { StreamCallback };
@@ -26,7 +24,7 @@ export interface RunAgentOptions {
   cwd: string;
   sessionId?: string;
   model?: string;
-  provider?: 'claude' | 'codex';
+  provider?: 'claude' | 'codex' | 'mock';
   /** Resolved path to agent prompt file */
   agentPath?: string;
   /** Allowed tools for this agent run */
@@ -40,9 +38,8 @@ export interface RunAgentOptions {
   bypassPermissions?: boolean;
 }
 
-type AgentProvider = 'claude' | 'codex';
-
-function resolveProvider(cwd: string, options?: RunAgentOptions, agentConfig?: CustomAgentConfig): AgentProvider {
+function resolveProvider(cwd: string, options?: RunAgentOptions, agentConfig?: CustomAgentConfig): ProviderType {
+  // Mock provider must be explicitly specified (no fallback)
   if (options?.provider) return options.provider;
   if (agentConfig?.provider) return agentConfig.provider;
   const projectConfig = loadProjectConfig(cwd);
@@ -137,33 +134,22 @@ export async function runCustomAgent(
     systemPrompt = `${systemPrompt}\n\n${options.statusRulesPrompt}`;
   }
 
-  const tools = allowedTools;
-  const provider = resolveProvider(options.cwd, options, agentConfig);
-  const model = resolveModel(options.cwd, options, agentConfig);
-  if (provider === 'codex') {
-    const callOptions: CodexCallOptions = {
-      cwd: options.cwd,
-      sessionId: options.sessionId,
-      model,
-      statusPatterns: agentConfig.statusPatterns,
-      onStream: options.onStream,
-    };
-    return callCodexCustom(agentConfig.name, task, systemPrompt, callOptions);
-  }
+  const providerType = resolveProvider(options.cwd, options, agentConfig);
+  const provider = getProvider(providerType);
 
-    const callOptions: ClaudeCallOptions = {
-      cwd: options.cwd,
-      sessionId: options.sessionId,
-      allowedTools: tools,
-      model,
-      statusPatterns: agentConfig.statusPatterns,
+  const callOptions: ProviderCallOptions = {
+    cwd: options.cwd,
+    sessionId: options.sessionId,
+    allowedTools,
+    model: resolveModel(options.cwd, options, agentConfig),
+    statusPatterns: agentConfig.statusPatterns,
     onStream: options.onStream,
     onPermissionRequest: options.onPermissionRequest,
     onAskUserQuestion: options.onAskUserQuestion,
     bypassPermissions: options.bypassPermissions,
   };
 
-  return callClaudeCustom(agentConfig.name, task, systemPrompt, callOptions);
+  return provider.callCustom(agentConfig.name, task, systemPrompt, callOptions);
 }
 
 /**
@@ -221,26 +207,14 @@ export async function runAgent(
       systemPrompt = `${systemPrompt}\n\n${options.statusRulesPrompt}`;
     }
 
-    const tools = options.allowedTools;
-    const provider = resolveProvider(options.cwd, options);
-    const model = resolveModel(options.cwd, options);
+    const providerType = resolveProvider(options.cwd, options);
+    const provider = getProvider(providerType);
 
-    if (provider === 'codex') {
-      const callOptions: CodexCallOptions = {
-        cwd: options.cwd,
-        sessionId: options.sessionId,
-        model,
-        systemPrompt,
-        onStream: options.onStream,
-      };
-      return callCodex(agentName, task, callOptions);
-    }
-
-    const callOptions: ClaudeCallOptions = {
+    const callOptions: ProviderCallOptions = {
       cwd: options.cwd,
       sessionId: options.sessionId,
-      allowedTools: tools,
-      model,
+      allowedTools: options.allowedTools,
+      model: resolveModel(options.cwd, options),
       systemPrompt,
       onStream: options.onStream,
       onPermissionRequest: options.onPermissionRequest,
@@ -248,7 +222,7 @@ export async function runAgent(
       bypassPermissions: options.bypassPermissions,
     };
 
-    return callClaude(agentName, task, callOptions);
+    return provider.call(agentName, task, callOptions);
   }
 
   // Fallback: Look for custom agent by name

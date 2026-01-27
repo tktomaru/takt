@@ -65,7 +65,7 @@ export interface WorkflowStep {
   /** Resolved absolute path to agent prompt file (set by loader) */
   agentPath?: string;
   /** Provider override for this step */
-  provider?: 'claude' | 'codex';
+  provider?: 'claude' | 'codex' | 'mock';
   /** Model override for this step */
   model?: string;
   instructionTemplate: string;
@@ -129,7 +129,7 @@ export interface CustomAgentConfig {
   statusPatterns?: Record<string, string>;
   claudeAgent?: string;
   claudeSkill?: string;
-  provider?: 'claude' | 'codex';
+  provider?: 'claude' | 'codex' | 'mock';
   model?: string;
 }
 
@@ -148,7 +148,7 @@ export interface GlobalConfig {
   trustedDirectories: string[];
   defaultWorkflow: string;
   logLevel: 'debug' | 'info' | 'warn' | 'error';
-  provider?: 'claude' | 'codex';
+  provider?: 'claude' | 'codex' | 'mock';
   model?: string;
   debug?: DebugConfig;
 }
@@ -157,5 +157,5 @@ export interface GlobalConfig {
 export interface ProjectConfig {
   workflow?: string;
   agents?: CustomAgentConfig[];
-  provider?: 'claude' | 'codex';
+  provider?: 'claude' | 'codex' | 'mock';
 }

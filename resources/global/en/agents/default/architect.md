@@ -159,7 +159,68 @@ Prohibited patterns:
 | Hidden Dependencies | Child components implicitly calling APIs etc. |
 | Non-idiomatic | Custom implementation ignoring language/FW conventions |
 
-### 6. Unnecessary Backward Compatibility Code Detection
+### 6. Abstraction Level Evaluation
+
+**Conditional Branch Proliferation Detection:**
+
+| Pattern | Judgment |
+|---------|----------|
+| Same if-else pattern in 3+ places | Abstract with polymorphism → **REJECT** |
+| switch/case with 5+ branches | Consider Strategy/Map pattern |
+| Flag arguments changing behavior | Split into separate functions → **REJECT** |
+| Type-based branching (instanceof/typeof) | Replace with polymorphism → **REJECT** |
+| Nested conditionals (3+ levels) | Early return or extract → **REJECT** |
+
+**Abstraction Level Mismatch Detection:**
+
+| Pattern | Problem | Fix |
+|---------|---------|-----|
+| Low-level details in high-level processing | Hard to read | Extract details to functions |
+| Mixed abstraction levels in one function | Cognitive load | Align to same granularity |
+| DB operations mixed with business logic | Responsibility violation | Separate to Repository layer |
+| Config values mixed with processing logic | Hard to change | Externalize configuration |
+
+**Good Abstraction Examples:**
+
+```typescript
+// ❌ Proliferating conditionals
+function process(type: string) {
+  if (type === 'A') { /* process A */ }
+  else if (type === 'B') { /* process B */ }
+  else if (type === 'C') { /* process C */ }
+  // ...continues
+}
+
+// ✅ Abstract with Map pattern
+const processors: Record<string, () => void> = {
+  A: processA,
+  B: processB,
+  C: processC,
+};
+function process(type: string) {
+  processors[type]?.();
+}
+```
+
+```typescript
+// ❌ Mixed abstraction levels
+function createUser(data: UserData) {
+  // High level: business logic
+  validateUser(data);
+  // Low level: DB operation details
+  const conn = await pool.getConnection();
+  await conn.query('INSERT INTO users...');
+  conn.release();
+}
+
+// ✅ Aligned abstraction levels
+function createUser(data: UserData) {
+  validateUser(data);
+  await userRepository.save(data);  // Details hidden
+}
+```
+
+### 7. Unnecessary Backward Compatibility Code Detection
 
 **AI tends to leave unnecessary code "for backward compatibility." Don't overlook this.**
 
@@ -188,7 +249,7 @@ Code that should be kept:
 
 **Be suspicious when AI says "for backward compatibility."** Verify if it's really needed.
 
-### 7. Workaround Detection
+### 8. Workaround Detection
 
 **Don't overlook compromises made to "just make it work."**
 
@@ -203,7 +264,7 @@ Code that should be kept:
 
 **Always point these out.** Temporary fixes become permanent.
 
-### 8. Quality Attributes
+### 9. Quality Attributes
 
 | Attribute | Review Point |
 |-----------|--------------|
@@ -211,7 +272,7 @@ Code that should be kept:
 | Maintainability | Easy to modify and fix |
 | Observability | Logging and monitoring enabled |
 
-### 9. Big Picture
+### 10. Big Picture
 
 **Caution**: Don't get lost in minor "clean code" nitpicks.
 
@@ -222,7 +283,7 @@ Verify:
 - Does it align with business requirements
 - Is naming consistent with the domain
 
-### 10. Change Scope Assessment
+### 11. Change Scope Assessment
 
 **Check change scope and include in report (non-blocking).**
 
@@ -241,7 +302,7 @@ Verify:
 **Include as suggestions (non-blocking):**
 - If splittable, present splitting proposal
 
-### 11. Circular Review Detection
+### 12. Circular Review Detection
 
 When review count is provided (e.g., "Review count: 3rd"), adjust judgment accordingly.
 

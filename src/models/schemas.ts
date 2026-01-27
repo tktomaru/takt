@@ -60,7 +60,7 @@ export const WorkflowStepRawSchema = z.object({
   /** Display name for the agent (shown in output). Falls back to agent basename if not specified */
   agent_name: z.string().optional(),
   allowed_tools: z.array(z.string()).optional(),
-  provider: z.enum(['claude', 'codex']).optional(),
+  provider: z.enum(['claude', 'codex', 'mock']).optional(),
   model: z.string().optional(),
   instruction: z.string().optional(),
   instruction_template: z.string().optional(),
@@ -94,7 +94,7 @@ export const CustomAgentConfigSchema = z.object({
   status_patterns: z.record(z.string(), z.string()).optional(),
   claude_agent: z.string().optional(),
   claude_skill: z.string().optional(),
-  provider: z.enum(['claude', 'codex']).optional(),
+  provider: z.enum(['claude', 'codex', 'mock']).optional(),
   model: z.string().optional(),
 }).refine(
   (data) => data.prompt_file || data.prompt || data.claude_agent || data.claude_skill,
@@ -116,7 +116,7 @@ export const GlobalConfigSchema = z.object({
   trusted_directories: z.array(z.string()).optional().default([]),
   default_workflow: z.string().optional().default('default'),
   log_level: z.enum(['debug', 'info', 'warn', 'error']).optional().default('info'),
-  provider: z.enum(['claude', 'codex']).optional().default('claude'),
+  provider: z.enum(['claude', 'codex', 'mock']).optional().default('claude'),
   model: z.string().optional(),
   debug: DebugConfigSchema.optional(),
 });
@@ -125,7 +125,7 @@ export const GlobalConfigSchema = z.object({
 export const ProjectConfigSchema = z.object({
   workflow: z.string().optional(),
   agents: z.array(CustomAgentConfigSchema).optional(),
-  provider: z.enum(['claude', 'codex']).optional(),
+  provider: z.enum(['claude', 'codex', 'mock']).optional(),
 });
 
 /**

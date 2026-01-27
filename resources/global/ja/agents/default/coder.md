@@ -105,7 +105,45 @@
 | ボーイスカウト | 触った箇所は少し改善して去る |
 | Fail Fast | エラーは早期に検出。握りつぶさない |
 
-**迷ったら**: Simple を選ぶ。抽象化は後からでもできる。
+**迷ったら**: Simple を選ぶ。
+
+## 抽象化の原則
+
+**条件分岐を追加する前に考える:**
+- 同じ条件が他にもあるか → あればパターンで抽象化
+- 今後も分岐が増えそうか → Strategy/Mapパターンを使う
+- 型で分岐しているか → ポリモーフィズムで置換
+
+```typescript
+// ❌ 条件分岐を増やす
+if (type === 'A') { ... }
+else if (type === 'B') { ... }
+else if (type === 'C') { ... }  // また増えた
+
+// ✅ Mapで抽象化
+const handlers = { A: handleA, B: handleB, C: handleC };
+handlers[type]?.();
+```
+
+**抽象度を揃える:**
+- 1つの関数内では同じ粒度の処理を並べる
+- 詳細な処理は別関数に切り出す
+- 「何をするか」と「どうやるか」を混ぜない
+
+```typescript
+// ❌ 抽象度が混在
+function processOrder(order) {
+  validateOrder(order);           // 高レベル
+  const conn = pool.getConnection(); // 低レベル詳細
+  conn.query('INSERT...');        // 低レベル詳細
+}
+
+// ✅ 抽象度を揃える
+function processOrder(order) {
+  validateOrder(order);
+  saveOrder(order);  // 詳細は隠蔽
+}
+```
 
 **言語・フレームワークの作法に従う:**
 - Pythonなら Pythonic に、KotlinならKotlinらしく
@@ -134,6 +172,121 @@
 - 子は状態を直接変更しない（イベントを親に通知）
 - 状態の流れは単方向
 
+## エラーハンドリング
+
+**原則: エラーは一元管理する。各所でtry-catchしない。**
+
+```typescript
+// ❌ 各所でtry-catch
+async function createUser(data) {
+  try {
+    const user = await userService.create(data)
+    return user
+  } catch (e) {
+    console.error(e)
+    throw new Error('ユーザー作成に失敗しました')
+  }
+}
+
+// ✅ 上位層で一元処理
+// Controller/Handler層でまとめてキャッチ
+// または @ControllerAdvice / ErrorBoundary で処理
+async function createUser(data) {
+  return await userService.create(data)  // 例外はそのまま上に投げる
+}
+```
+
+**エラー処理の配置:**
+
+| 層 | 責務 |
+|----|------|
+| ドメイン/サービス層 | ビジネスルール違反時に例外をスロー |
+| Controller/Handler層 | 例外をキャッチしてレスポンスに変換 |
+| グローバルハンドラ | 共通例外（NotFound, 認証エラー等）を処理 |
+
+## 変換処理の配置
+
+**原則: 変換メソッドはDTO側に持たせる。**
+
+```typescript
+// ✅ Request/Response DTOに変換メソッド
+interface CreateUserRequest {
+  name: string
+  email: string
+}
+
+function toUseCaseInput(req: CreateUserRequest): CreateUserInput {
+  return { name: req.name, email: req.email }
+}
+
+// Controller
+const input = toUseCaseInput(request)
+const output = await useCase.execute(input)
+return UserResponse.from(output)
+```
+
+**変換の方向:**
+```
+Request → toInput() → UseCase/Service → Output → Response.from()
+```
+
+## 共通化の判断
+
+**3回ルール:**
+- 1回目: そのまま書く
+- 2回目: まだ共通化しない（様子見）
+- 3回目: 共通化を検討
+
+**共通化すべきもの:**
+- 同じ処理が3箇所以上
+- 同じスタイル/UIパターン
+- 同じバリデーションロジック
+- 同じフォーマット処理
+
+**共通化すべきでないもの:**
+- 似ているが微妙に違うもの（無理に汎用化すると複雑化）
+- 1-2箇所しか使わないもの
+- 「将来使うかも」という予測に基づくもの
+
+```typescript
+// ❌ 過度な汎用化
+function formatValue(value, type, options) {
+  if (type === 'currency') { ... }
+  else if (type === 'date') { ... }
+  else if (type === 'percentage') { ... }
+}
+
+// ✅ 用途別に関数を分ける
+function formatCurrency(amount: number): string { ... }
+function formatDate(date: Date): string { ... }
+function formatPercentage(value: number): string { ... }
+```
+
+## テストの書き方
+
+**原則: テストは「Given-When-Then」で構造化する。**
+
+```typescript
+test('ユーザーが存在しない場合、NotFoundエラーを返す', async () => {
+  // Given: 存在しないユーザーID
+  const nonExistentId = 'non-existent-id'
+
+  // When: ユーザー取得を試みる
+  const result = await getUser(nonExistentId)
+
+  // Then: NotFoundエラーが返る
+  expect(result.error).toBe('NOT_FOUND')
+})
+```
+
+**テストの優先度:**
+
+| 優先度 | 対象 |
+|--------|------|
+| 高 | ビジネスロジック、状態遷移 |
+| 中 | エッジケース、エラーハンドリング |
+| 低 | 単純なCRUD、UIの見た目 |
+
 ## 禁止事項
 
 - **フォールバック値の乱用** - `?? 'unknown'`、`|| 'default'` で問題を隠さない
@@ -143,3 +296,4 @@
 - **オブジェクト/配列の直接変更** - スプレッド演算子で新規作成
 - **console.log** - 本番コードに残さない
 - **機密情報のハードコーディング**
+- **各所でのtry-catch** - エラーは上位層で一元処理

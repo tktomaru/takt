@@ -105,7 +105,45 @@ Perform self-check after implementation.
 | Boy Scout | Leave touched areas slightly improved |
 | Fail Fast | Detect errors early. Don't swallow them |
 
-**When in doubt**: Choose Simple. Abstraction can come later.
+**When in doubt**: Choose Simple.
+
+## Abstraction Principles
+
+**Before adding conditional branches, consider:**
+- Does this condition exist elsewhere? → Abstract with a pattern
+- Will more branches be added? → Use Strategy/Map pattern
+- Branching on type? → Replace with polymorphism
+
+```typescript
+// ❌ Adding more conditionals
+if (type === 'A') { ... }
+else if (type === 'B') { ... }
+else if (type === 'C') { ... }  // Yet another one
+
+// ✅ Abstract with Map
+const handlers = { A: handleA, B: handleB, C: handleC };
+handlers[type]?.();
+```
+
+**Align abstraction levels:**
+- Keep same granularity of operations within one function
+- Extract detailed processing to separate functions
+- Don't mix "what to do" with "how to do it"
+
+```typescript
+// ❌ Mixed abstraction levels
+function processOrder(order) {
+  validateOrder(order);           // High level
+  const conn = pool.getConnection(); // Low level detail
+  conn.query('INSERT...');        // Low level detail
+}
+
+// ✅ Aligned abstraction levels
+function processOrder(order) {
+  validateOrder(order);
+  saveOrder(order);  // Details hidden
+}
+```
 
 **Follow language/framework conventions:**
 - Be Pythonic in Python, Kotlin-like in Kotlin
@@ -134,6 +172,121 @@ Perform self-check after implementation.
 - Children don't modify state directly (notify parent via events)
 - State flows in one direction
 
+## Error Handling
+
+**Principle: Centralize error handling. Don't scatter try-catch everywhere.**
+
+```typescript
+// ❌ Try-catch everywhere
+async function createUser(data) {
+  try {
+    const user = await userService.create(data)
+    return user
+  } catch (e) {
+    console.error(e)
+    throw new Error('Failed to create user')
+  }
+}
+
+// ✅ Centralized handling at upper layer
+// Catch at Controller/Handler layer
+// Or use @ControllerAdvice / ErrorBoundary
+async function createUser(data) {
+  return await userService.create(data)  // Let exceptions propagate
+}
+```
+
+**Error handling placement:**
+
+| Layer | Responsibility |
+|-------|----------------|
+| Domain/Service layer | Throw exceptions on business rule violations |
+| Controller/Handler layer | Catch exceptions and convert to response |
+| Global handler | Handle common exceptions (NotFound, auth errors, etc.) |
+
+## Transformation Placement
+
+**Principle: Put conversion methods on DTOs.**
+
+```typescript
+// ✅ Request/Response DTOs have conversion methods
+interface CreateUserRequest {
+  name: string
+  email: string
+}
+
+function toUseCaseInput(req: CreateUserRequest): CreateUserInput {
+  return { name: req.name, email: req.email }
+}
+
+// Controller
+const input = toUseCaseInput(request)
+const output = await useCase.execute(input)
+return UserResponse.from(output)
+```
+
+**Conversion direction:**
+```
+Request → toInput() → UseCase/Service → Output → Response.from()
+```
+
+## Extraction Decisions
+
+**Rule of Three:**
+- 1st time: Write it inline
+- 2nd time: Don't extract yet (wait and see)
+- 3rd time: Consider extraction
+
+**Should extract:**
+- Same logic in 3+ places
+- Same style/UI pattern
+- Same validation logic
+- Same formatting logic
+
+**Should NOT extract:**
+- Similar but slightly different (forced generalization adds complexity)
+- Used in only 1-2 places
+- Based on "might use later" predictions
+
+```typescript
+// ❌ Over-generalization
+function formatValue(value, type, options) {
+  if (type === 'currency') { ... }
+  else if (type === 'date') { ... }
+  else if (type === 'percentage') { ... }
+}
+
+// ✅ Separate functions by purpose
+function formatCurrency(amount: number): string { ... }
+function formatDate(date: Date): string { ... }
+function formatPercentage(value: number): string { ... }
+```
+
+## Writing Tests
+
+**Principle: Structure tests with "Given-When-Then".**
+
+```typescript
+test('returns NotFound error when user does not exist', async () => {
+  // Given: non-existent user ID
+  const nonExistentId = 'non-existent-id'
+
+  // When: attempt to get user
+  const result = await getUser(nonExistentId)
+
+  // Then: NotFound error is returned
+  expect(result.error).toBe('NOT_FOUND')
+})
+```
+
+**Test priority:**
+
+| Priority | Target |
+|----------|--------|
+| High | Business logic, state transitions |
+| Medium | Edge cases, error handling |
+| Low | Simple CRUD, UI appearance |
+
 ## Prohibited
 
 - **Fallback value overuse** - Don't hide problems with `?? 'unknown'`, `|| 'default'`
@@ -143,4 +296,5 @@ Perform self-check after implementation.
 - **Direct object/array mutation** - Create new with spread operator
 - **console.log** - Don't leave in production code
 - **Hardcoded secrets**
+- **Scattered try-catch** - Centralize error handling at upper layer
 

@@ -159,7 +159,68 @@ Vertical Slice の判定基準:
 | 隠れた依存 | 子コンポーネントが暗黙的にAPIを呼ぶ等 |
 | 非イディオマティック | 言語・FWの作法を無視した独自実装 |
 
-### 6. 不要な後方互換コードの検出
+### 6. 抽象化レベルの評価
+
+**条件分岐の肥大化検出:**
+
+| パターン | 判定 |
+|---------|------|
+| 同じif-elseパターンが3箇所以上 | ポリモーフィズムで抽象化 → **REJECT** |
+| switch/caseが5分岐以上 | Strategy/Mapパターンを検討 |
+| フラグ引数で挙動を変える | 別関数に分割 → **REJECT** |
+| 型による分岐（instanceof/typeof） | ポリモーフィズムに置換 → **REJECT** |
+| ネストした条件分岐（3段以上） | 早期リターンまたは抽出 → **REJECT** |
+
+**抽象度の不一致検出:**
+
+| パターン | 問題 | 修正案 |
+|---------|------|--------|
+| 高レベル処理の中に低レベル詳細 | 読みにくい | 詳細を関数に抽出 |
+| 1関数内で抽象度が混在 | 認知負荷 | 同じ粒度に揃える |
+| ビジネスロジックにDB操作が混在 | 責務違反 | Repository層に分離 |
+| 設定値と処理ロジックが混在 | 変更困難 | 設定を外部化 |
+
+**良い抽象化の例:**
+
+```typescript
+// ❌ 条件分岐の肥大化
+function process(type: string) {
+  if (type === 'A') { /* 処理A */ }
+  else if (type === 'B') { /* 処理B */ }
+  else if (type === 'C') { /* 処理C */ }
+  // ...続く
+}
+
+// ✅ Mapパターンで抽象化
+const processors: Record<string, () => void> = {
+  A: processA,
+  B: processB,
+  C: processC,
+};
+function process(type: string) {
+  processors[type]?.();
+}
+```
+
+```typescript
+// ❌ 抽象度の混在
+function createUser(data: UserData) {
+  // 高レベル: ビジネスロジック
+  validateUser(data);
+  // 低レベル: DB操作の詳細
+  const conn = await pool.getConnection();
+  await conn.query('INSERT INTO users...');
+  conn.release();
+}
+
+// ✅ 抽象度を揃える
+function createUser(data: UserData) {
+  validateUser(data);
+  await userRepository.save(data);  // 詳細は隠蔽
+}
+```
+
+### 7. 不要な後方互換コードの検出
 
 **AIは「後方互換のために」不要なコードを残しがちである。これを見逃さない。**
 

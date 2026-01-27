@@ -631,7 +631,7 @@ steps:
     pass_previous_response: true
     transitions:
       - condition: done
-        next_step: cqrs_es_review
+        next_step: ai_review
       - condition: blocked
         next_step: plan
 
