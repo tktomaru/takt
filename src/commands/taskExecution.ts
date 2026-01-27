@@ -136,7 +136,7 @@ export async function runAllTasks(
  * Resolve execution directory and workflow from task data.
  * If the task has worktree settings, create a worktree and use it as cwd.
  */
-function resolveTaskExecution(
+export function resolveTaskExecution(
   task: TaskInfo,
   defaultCwd: string,
   defaultWorkflow: string

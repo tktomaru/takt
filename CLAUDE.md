@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 TAKT (Task Agent Koordination Tool) is a multi-agent orchestration system for Claude Code. It enables YAML-based workflow definitions that coordinate multiple AI agents through state machine transitions.
 
-## Commands
+## Development Commands
 
 | Command | Description |
 |---------|-------------|
@@ -17,13 +17,26 @@ TAKT (Task Agent Koordination Tool) is a multi-agent orchestration system for Cl
 | `npx vitest run src/__tests__/client.test.ts` | Run single test file |
 | `npx vitest run -t "pattern"` | Run tests matching pattern |
 
+## CLI Slash Commands
+
+| Command | Description |
+|---------|-------------|
+| `takt /run-tasks` | Execute all pending tasks from `.takt/tasks/` once |
+| `takt /watch` | Watch `.takt/tasks/` and auto-execute tasks (resident process) |
+| `takt /add-task` | Add a new task interactively (YAML format) |
+| `takt /switch` | Switch workflow interactively |
+| `takt /clear` | Clear agent conversation sessions (reset state) |
+| `takt /refresh-builtin` | Update builtin resources from `resources/` to `~/.takt/` |
+| `takt /help` | Show help message |
+| `takt /config` | Display current configuration |
+
 ## Architecture
 
 ### Core Flow
 
 ```
 CLI (cli.ts)
-  → Slash commands (/run-tasks, /switch, /clear, /help, /config)
+  → Slash commands (/run-tasks, /watch, /add-task, /switch, /clear, /refresh-builtin, /help, /config)
   → or executeTask()
     → WorkflowEngine (workflow/engine.ts)
       → runAgent() (agents/runner.ts)
@@ -62,6 +75,11 @@ CLI (cli.ts)
 - `workflowLoader.ts` - YAML workflow parsing with Zod validation (loads from `~/.takt/workflows/` only)
 - `agentLoader.ts` - Agent prompt file loading
 - `paths.ts` - Directory structure (`.takt/`, `~/.takt/`), session management
+
+**Task Management** (`src/task/`)
+- `runner.ts` - TaskRunner class for managing task files (`.takt/tasks/`)
+- `watcher.ts` - TaskWatcher class for polling and auto-executing tasks (used by `/watch`)
+- `index.ts` - Task operations (getNextTask, completeTask, addTask)
 
 ### Data Flow
 
@@ -166,3 +184,11 @@ model: opus          # Default model for all steps (unless overridden)
 - `rejected` - Review failed, needs major rework
 - `improve` - Needs improvement (security concerns, quality issues)
 - `always` - Unconditional transition
+
+## Testing Notes
+
+- Vitest for testing framework
+- Tests use file system fixtures in `__tests__/` subdirectories
+- Mock workflows and agent configs for integration tests
+- Test single files: `npx vitest run src/__tests__/filename.test.ts`
+- Pattern matching: `npx vitest run -t "test pattern"`

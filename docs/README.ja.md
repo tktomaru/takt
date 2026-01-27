@@ -1,12 +1,14 @@
 # TAKT
 
-**T**ask **A**gent **K**oordination **T**ool - Claude Code向けのマルチエージェントオーケストレーションシステム（Codex対応予定）
+**T**ask **A**gent **K**oordination **T**ool - Claude CodeとOpenAI Codex向けのマルチエージェントオーケストレーションシステム
 
 > **Note**: このプロジェクトは個人のペースで開発されています。詳細は[免責事項](#免責事項)をご覧ください。
 
 ## 必要条件
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) がインストール・設定済みであること
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) または Codex がインストール・設定済みであること
+
+TAKTはClaude CodeとCodexの両方をプロバイダーとしてサポートしています。セットアップ時にプロバイダーを選択できます。
 
 ## インストール
 
@@ -20,22 +22,32 @@ npm install -g takt
 # タスクを実行（ワークフロー選択プロンプトが表示されます）
 takt "ログイン機能を追加して"
 
-# ワークフローを切り替え
-takt /switch
+# タスクをキューに追加
+takt /add-task "ログインのバグを修正"
 
 # 保留中のタスクをすべて実行
 takt /run-tasks
+
+# タスクを監視して自動実行
+takt /watch
+
+# ワークフローを切り替え
+takt /switch
 ```
 
 ## コマンド一覧
 
 | コマンド | 説明 |
 |---------|------|
-| `takt "タスク"` | ワークフロー選択後にタスクを実行 |
+| `takt "タスク"` | 現在のワークフローでタスクを実行（セッション継続） |
 | `takt -r "タスク"` | 前回のセッションを再開してタスクを実行 |
-| `takt /run-tasks` | 保留中のタスクをすべて実行 |
+| `takt /run-tasks` | `.takt/tasks/` の保留中タスクをすべて実行 |
+| `takt /watch` | `.takt/tasks/` を監視してタスクを自動実行（常駐プロセス） |
+| `takt /add-task` | 新しいタスクを対話的に追加（YAML形式） |
 | `takt /switch` | ワークフローを対話的に切り替え |
 | `takt /clear` | エージェントの会話セッションをクリア |
+| `takt /refresh-builtin` | ビルトインのエージェント/ワークフローを最新版に更新 |
+| `takt /config` | 現在の設定を表示 |
 | `takt /help` | ヘルプを表示 |
 
 ## 実践的な使い方ガイド
@@ -54,43 +66,33 @@ takt -r "パスワードに特殊文字が含まれているとバグが発生�
 
 `-r`フラグはエージェントの会話履歴を保持し、自然なやり取りを可能にします。
 
-### MAGIシステムで遊ぶ
+### タスク管理
 
-MAGIはエヴァンゲリオンにインスパイアされた審議システムです。3つのAIペルソナがあなたの質問を異なる視点から分析し、投票します：
+TAKTは`.takt/tasks/`内のタスクファイルによるバッチ処理をサポートしています。`.yaml`/`.yml`と`.md`の両方のファイル形式に対応しています。
 
-```bash
-# プロンプトが表示されたら'magi'ワークフローを選択
-takt "RESTからGraphQLに移行すべきか？"
-```
-
-3つのMAGIペルソナ：
-- **MELCHIOR-1**（科学者）：論理的、データ駆動の分析
-- **BALTHASAR-2**（母性）：チームと人間中心の視点
-- **CASPER-3**（現実主義者）：実用的で現実的な考慮
-
-各ペルソナは APPROVE、REJECT、または CONDITIONAL で投票します。最終決定は多数決で行われます。
-
-### `/run-tasks` でバッチ処理
-
-`/run-tasks`コマンドは`.takt/tasks/`ディレクトリ内のすべてのタスクファイルを実行します：
+#### `/add-task` でタスクを追加
 
 ```bash
-# 思いつくままにタスクファイルを作成
-echo "認証モジュールのユニットテストを追加" > .takt/tasks/001-add-tests.md
-echo "データベースレイヤーをリファクタリング" > .takt/tasks/002-refactor-db.md
-echo "APIドキュメントを更新" > .takt/tasks/003-update-docs.md
+# クイック追加（worktreeなし）
+takt /add-task "認証機能を追加"
 
-# すべての保留タスクを実行
-takt /run-tasks
+# 対話モード（worktree、ブランチ、ワークフローオプションを指定可能）
+takt /add-task
 ```
 
-**動作の仕組み：**
-- タスクはアルファベット順に実行されます（`001-`、`002-`のようなプレフィックスで順序を制御）
-- 各タスクファイルには実行すべき内容の説明を含めます
-- 完了したタスクは実行レポートとともに`.takt/completed/`に移動されます
-- 実行中に追加された新しいタスクも動的に取得されます
+#### タスクファイルの形式
 
-**タスクファイルの形式：**
+**YAML形式**（推奨、worktree/branch/workflowオプション対応）：
+
+```yaml
+# .takt/tasks/add-auth.yaml
+task: "認証機能を追加する"
+worktree: true                  # 隔離されたgit worktreeで実行
+branch: "feat/add-auth"         # ブランチ名（省略時は自動生成）
+workflow: "default"             # ワークフロー指定（省略時は現在のもの）
+```
+
+**Markdown形式**（シンプル、後方互換）：
 
 ```markdown
 # .takt/tasks/add-login-feature.md
@@ -103,10 +105,35 @@ takt /run-tasks
 - 失敗時のエラーハンドリング
 ```
 
-これは以下のような場合に最適です：
-- アイデアをファイルとしてキャプチャするブレインストーミングセッション
-- 大きな機能を小さなタスクに分割する場合
-- タスクファイルを生成する自動化パイプライン
+#### Git Worktree による隔離実行
+
+YAMLタスクファイルで`worktree`を指定すると、各タスクを隔離されたgit worktreeで実行し、メインの作業ディレクトリをクリーンに保てます：
+
+- `worktree: true` - `.takt/worktrees/{timestamp}-{task-slug}/`に自動作成
+- `worktree: "/path/to/dir"` - 指定パスに作成
+- `branch: "feat/xxx"` - 指定ブランチを使用（省略時は`takt/{timestamp}-{slug}`で自動生成）
+- `worktree`省略 - カレントディレクトリで実行（デフォルト）
+
+#### `/run-tasks` でタスクを実行
+
+```bash
+takt /run-tasks
+```
+
+- タスクはアルファベット順に実行されます（`001-`、`002-`のようなプレフィックスで順序を制御）
+- 完了したタスクは実行レポートとともに`.takt/completed/`に移動されます
+- 実行中に追加された新しいタスクも動的に取得されます
+
+#### `/watch` でタスクを監視
+
+```bash
+takt /watch
+```
+
+ウォッチモードは`.takt/tasks/`をポーリングし、新しいタスクファイルが現れると自動実行します。`Ctrl+C`で停止する常駐プロセスです。以下のような場合に便利です：
+- タスクファイルを生成するCI/CDパイプライン
+- 外部プロセスがタスクを追加する自動化ワークフロー
+- タスクを順次キューイングする長時間の開発セッション
 
 ### カスタムワークフローの追加
 
@@ -178,11 +205,56 @@ agent: /path/to/custom/agent.md
 | 変数 | 説明 |
 |------|------|
 | `{task}` | 元のユーザーリクエスト |
-| `{iteration}` | 現在のイテレーション番号 |
+| `{iteration}` | ワークフロー全体のターン数（実行された全ステップ数） |
 | `{max_iterations}` | 最大イテレーション数 |
+| `{step_iteration}` | ステップごとのイテレーション数（このステップが実行された回数） |
 | `{previous_response}` | 前のステップの出力（`pass_previous_response: true`が必要） |
 | `{user_inputs}` | ワークフロー中の追加ユーザー入力 |
 | `{git_diff}` | 現在のgit diff（コミットされていない変更） |
+| `{report_dir}` | レポートディレクトリ名（例：`20250126-143052-task-summary`） |
+
+### ワークフローの設計
+
+各ワークフローステップには3つの重要な要素が必要です。
+
+**1. エージェント** - システムプロンプトを含むMarkdownファイル：
+
+```yaml
+agent: ~/.takt/agents/default/coder.md    # エージェントプロンプトファイルのパス
+agent_name: coder                          # 表示名（オプション）
+```
+
+**2. ステータスルール** - エージェントが完了を通知する方法を定義。エージェントは`[CODER:DONE]`や`[ARCHITECT:REJECT]`のようなステータスマーカーを出力し、TAKTがそれを検出して遷移を駆動します：
+
+```yaml
+status_rules_prompt: |
+  最終出力には必ずステータスタグを含めてください：
+  - `[CODER:DONE]` 実装が完了した場合
+  - `[CODER:BLOCKED]` 進行できない場合
+```
+
+**3. 遷移** - ステータスに基づいて次のステップにルーティング：
+
+```yaml
+transitions:
+  - condition: done        # ステータスタグDONEに対応
+    next_step: review      # reviewステップへ遷移
+  - condition: blocked     # ステータスタグBLOCKEDに対応
+    next_step: ABORT       # ワークフローを失敗終了
+```
+
+使用可能な遷移条件：`done`、`blocked`、`approved`、`rejected`、`improve`、`always`
+特殊なnext_step値：`COMPLETE`（成功）、`ABORT`（失敗）
+
+**ステップオプション：**
+
+| オプション | デフォルト | 説明 |
+|-----------|-----------|------|
+| `pass_previous_response` | `true` | 前のステップの出力を`{previous_response}`に渡す |
+| `on_no_status` | - | ステータス未検出時の動作：`complete`、`continue`、`stay` |
+| `allowed_tools` | - | エージェントが使用できるツール一覧（Read, Glob, Grep, Edit, Write, Bash等） |
+| `provider` | - | このステップのプロバイダーを上書き（`claude`または`codex`） |
+| `model` | - | このステップのモデルを上書き |
 
 ## ワークフロー
 
@@ -215,11 +287,28 @@ steps:
         next_step: implement
 ```
 
+## ビルトインワークフロー
+
+TAKTには複数のビルトインワークフローが同梱されています：
+
+| ワークフロー | 説明 |
+|------------|------|
+| `default` | フル開発ワークフロー：計画 → 実装 → アーキテクトレビュー → AIレビュー → セキュリティレビュー → スーパーバイザー承認。各レビュー段階に修正ループあり。 |
+| `simple` | defaultの簡略版：計画 → 実装 → アーキテクトレビュー → AIレビュー → スーパーバイザー。中間の修正ステップなし。 |
+| `research` | リサーチワークフロー：プランナー → ディガー → スーパーバイザー。質問せずに自律的にリサーチを実行。 |
+| `expert-review` | ドメインエキスパートによる包括的レビュー：CQRS+ES、フロントエンド、AI、セキュリティ、QAレビューと修正ループ。 |
+| `magi` | エヴァンゲリオンにインスパイアされた審議システム。3つのAIペルソナ（MELCHIOR、BALTHASAR、CASPER）が分析し投票。 |
+
+`takt /switch` でワークフローを切り替えられます。
+
 ## ビルトインエージェント
 
 - **coder** - 機能を実装しバグを修正
 - **architect** - コードをレビューしフィードバックを提供
 - **supervisor** - 最終検証と承認
+- **planner** - タスク分析と実装計画
+- **ai-reviewer** - AI生成コードの品質レビュー
+- **security** - セキュリティ脆弱性の評価
 
 ## カスタムエージェント
 
@@ -230,6 +319,8 @@ agents:
   - name: my-reviewer
     prompt_file: .takt/prompts/reviewer.md
     allowed_tools: [Read, Glob, Grep]
+    provider: claude             # オプション：claude または codex
+    model: opus                  # Claude: opus/sonnet/haiku、Codex: gpt-5.2-codex 等
     status_patterns:
       approved: "\\[APPROVE\\]"
       rejected: "\\[REJECT\\]"
@@ -239,9 +330,17 @@ agents:
 
 ```
 ~/.takt/
-├── config.yaml          # グローバル設定
+├── config.yaml          # グローバル設定（プロバイダー、モデル、ワークフロー等）
 ├── workflows/           # ワークフロー定義
 └── agents/              # エージェントプロンプトファイル
+
+.takt/                   # プロジェクトレベルの設定
+├── agents.yaml          # カスタムエージェント定義
+├── tasks/               # 保留中のタスクファイル（.yaml, .md）
+├── completed/           # 完了したタスクとレポート
+├── worktrees/           # タスク隔離実行用のgit worktree
+├── reports/             # 実行レポート（自動生成）
+└── logs/                # セッションログ
 ```
 
 ## API使用例
@@ -300,6 +399,7 @@ docker compose run --rm build
 - [Agent Guide](./agents.md) - カスタムエージェントの設定
 - [Changelog](../CHANGELOG.md) - バージョン履歴
 - [Security Policy](../SECURITY.md) - 脆弱性報告
+- [ブログ：TAKT - AIエージェントオーケストレーション](https://zenn.dev/nrs/articles/c6842288a526d7) - 設計思想と実践的な使い方ガイド
 
 ## ライセンス
 

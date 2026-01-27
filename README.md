@@ -26,22 +26,32 @@ npm install -g takt
 # Run a task (will prompt for workflow selection)
 takt "Add a login feature"
 
-# Switch workflow
-takt /switch
+# Add a task to the queue
+takt /add-task "Fix the login bug"
 
 # Run all pending tasks
 takt /run-tasks
+
+# Watch for tasks and auto-execute
+takt /watch
+
+# Switch workflow
+takt /switch
 ```
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `takt "task"` | Execute task with workflow selection |
+| `takt "task"` | Execute task with current workflow (continues session) |
 | `takt -r "task"` | Execute task, resuming previous session |
-| `takt /run-tasks` | Run all pending tasks |
+| `takt /run-tasks` | Run all pending tasks from `.takt/tasks/` |
+| `takt /watch` | Watch `.takt/tasks/` and auto-execute tasks (stays resident) |
+| `takt /add-task` | Add a new task interactively (YAML format) |
 | `takt /switch` | Switch workflow interactively |
 | `takt /clear` | Clear agent conversation sessions |
+| `takt /refresh-builtin` | Update builtin agents/workflows to latest version |
+| `takt /config` | Display current configuration |
 | `takt /help` | Show help |
 
 ## Workflows
@@ -88,11 +98,28 @@ steps:
         next_step: implement
 ```
 
+## Built-in Workflows
+
+TAKT ships with several built-in workflows:
+
+| Workflow | Description |
+|----------|-------------|
+| `default` | Full development workflow: plan → implement → architect review → AI review → security review → supervisor approval. Includes fix loops for each review stage. |
+| `simple` | Simplified version of default: plan → implement → architect review → AI review → supervisor. No intermediate fix steps. |
+| `research` | Research workflow: planner → digger → supervisor. Autonomously researches topics without asking questions. |
+| `expert-review` | Comprehensive review with domain experts: CQRS+ES, Frontend, AI, Security, QA reviews with fix loops. |
+| `magi` | Deliberation system inspired by Evangelion. Three AI personas (MELCHIOR, BALTHASAR, CASPER) analyze and vote. |
+
+Switch between workflows with `takt /switch`.
+
 ## Built-in Agents
 
 - **coder** - Implements features and fixes bugs
 - **architect** - Reviews code and provides feedback
 - **supervisor** - Final verification and approval
+- **planner** - Task analysis and implementation planning
+- **ai-reviewer** - AI-generated code quality review
+- **security** - Security vulnerability assessment
 
 ## Custom Agents
 
@@ -149,6 +176,14 @@ Available Codex models:
 ├── config.yaml          # Global config (provider, model, workflows, etc.)
 ├── workflows/           # Workflow definitions
 └── agents/              # Agent prompt files
+
+.takt/                   # Project-level config
+├── agents.yaml          # Custom agent definitions
+├── tasks/               # Pending task files (.yaml, .md)
+├── completed/           # Completed tasks with reports
+├── worktrees/           # Git worktrees for isolated task execution
+├── reports/             # Execution reports (auto-generated)
+└── logs/                # Session logs
 ```
 
 ### Global Configuration
@@ -188,22 +223,6 @@ takt -r "The bug occurs when the password contains special characters"
 ```
 
 The `-r` flag preserves the agent's conversation history, allowing for natural back-and-forth interaction.
-
-### Playing with MAGI System
-
-MAGI is a deliberation system inspired by Evangelion. Three AI personas analyze your question from different perspectives and vote:
-
-```bash
-# Select 'magi' workflow when prompted
-takt "Should we migrate from REST to GraphQL?"
-```
-
-The three MAGI personas:
-- **MELCHIOR-1** (Scientist): Logical, data-driven analysis
-- **BALTHASAR-2** (Nurturer): Team and human-centered perspective
-- **CASPER-3** (Pragmatist): Practical, real-world considerations
-
-Each persona votes: APPROVE, REJECT, or CONDITIONAL. The final decision is made by majority vote.
 
 ### Adding Custom Workflows
 
@@ -268,27 +287,33 @@ You are a code reviewer focused on security.
 - [REVIEWER:REJECT] if issues found (list them)
 ```
 
-### Using `/run-tasks` for Batch Processing
+### Task Management
 
-The `/run-tasks` command executes all task files in `.takt/tasks/` directory:
+TAKT supports batch task processing through task files in `.takt/tasks/`. Both `.yaml`/`.yml` and `.md` file formats are supported.
+
+#### Adding Tasks with `/add-task`
 
 ```bash
-# Create task files as you think of them
-echo "Add unit tests for the auth module" > .takt/tasks/001-add-tests.md
-echo "Refactor the database layer" > .takt/tasks/002-refactor-db.md
-echo "Update API documentation" > .takt/tasks/003-update-docs.md
+# Quick add (no worktree)
+takt /add-task "Add authentication feature"
 
-# Run all pending tasks
-takt /run-tasks
+# Interactive mode (prompts for worktree, branch, workflow options)
+takt /add-task
 ```
 
-**How it works:**
-- Tasks are executed in alphabetical order (use prefixes like `001-`, `002-` for ordering)
-- Each task file should contain a description of what needs to be done
-- Completed tasks are moved to `.takt/completed/` with execution reports
-- New tasks added during execution will be picked up dynamically
+#### Task File Formats
 
-**Task file format:**
+**YAML format** (recommended, supports worktree/branch/workflow options):
+
+```yaml
+# .takt/tasks/add-auth.yaml
+task: "Add authentication feature"
+worktree: true                  # Run in isolated git worktree
+branch: "feat/add-auth"         # Branch name (auto-generated if omitted)
+workflow: "default"             # Workflow override (uses current if omitted)
+```
+
+**Markdown format** (simple, backward compatible):
 
 ```markdown
 # .takt/tasks/add-login-feature.md
@@ -301,10 +326,35 @@ Requirements:
 - Error handling for failed attempts
 ```
 
-This is perfect for:
-- Brainstorming sessions where you capture ideas as files
-- Breaking down large features into smaller tasks
-- Automated pipelines that generate task files
+#### Git Worktree Isolation
+
+YAML task files can specify `worktree` to run each task in an isolated git worktree, keeping the main working directory clean:
+
+- `worktree: true` - Auto-create at `.takt/worktrees/{timestamp}-{task-slug}/`
+- `worktree: "/path/to/dir"` - Create at specified path
+- `branch: "feat/xxx"` - Use specified branch (auto-generated as `takt/{timestamp}-{slug}` if omitted)
+- Omit `worktree` - Run in current working directory (default)
+
+#### Running Tasks with `/run-tasks`
+
+```bash
+takt /run-tasks
+```
+
+- Tasks are executed in alphabetical order (use prefixes like `001-`, `002-` for ordering)
+- Completed tasks are moved to `.takt/completed/` with execution reports
+- New tasks added during execution will be picked up dynamically
+
+#### Watching Tasks with `/watch`
+
+```bash
+takt /watch
+```
+
+Watch mode polls `.takt/tasks/` for new task files and auto-executes them as they appear. The process stays resident until `Ctrl+C`. This is useful for:
+- CI/CD pipelines that generate task files
+- Automated workflows where tasks are added by external processes
+- Long-running development sessions where tasks are queued over time
 
 ### Workflow Variables
 
@@ -313,11 +363,56 @@ Available variables in `instruction_template`:
 | Variable | Description |
 |----------|-------------|
 | `{task}` | Original user request |
-| `{iteration}` | Current iteration number |
-| `{max_iterations}` | Maximum iterations |
+| `{iteration}` | Workflow-wide turn count (total steps executed) |
+| `{max_iterations}` | Maximum iterations allowed |
+| `{step_iteration}` | Per-step iteration count (how many times THIS step has run) |
 | `{previous_response}` | Previous step's output (requires `pass_previous_response: true`) |
 | `{user_inputs}` | Additional user inputs during workflow |
 | `{git_diff}` | Current git diff (uncommitted changes) |
+| `{report_dir}` | Report directory name (e.g., `20250126-143052-task-summary`) |
+
+### Designing Workflows
+
+Each workflow step requires three key elements:
+
+**1. Agent** - A Markdown file containing the system prompt:
+
+```yaml
+agent: ~/.takt/agents/default/coder.md    # Path to agent prompt file
+agent_name: coder                          # Display name (optional)
+```
+
+**2. Status Rules** - Define how the agent signals completion. Agents output status markers like `[CODER:DONE]` or `[ARCHITECT:REJECT]` that TAKT detects to drive transitions:
+
+```yaml
+status_rules_prompt: |
+  Your final output MUST include a status tag:
+  - `[CODER:DONE]` if implementation is complete
+  - `[CODER:BLOCKED]` if you cannot proceed
+```
+
+**3. Transitions** - Route to the next step based on status:
+
+```yaml
+transitions:
+  - condition: done        # Maps to status tag DONE
+    next_step: review      # Go to review step
+  - condition: blocked     # Maps to status tag BLOCKED
+    next_step: ABORT       # End workflow with failure
+```
+
+Available transition conditions: `done`, `blocked`, `approved`, `rejected`, `improve`, `always`.
+Special next_step values: `COMPLETE` (success), `ABORT` (failure).
+
+**Step options:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `pass_previous_response` | `true` | Pass previous step's output to `{previous_response}` |
+| `on_no_status` | - | Behavior when no status is detected: `complete`, `continue`, `stay` |
+| `allowed_tools` | - | List of tools the agent can use (Read, Glob, Grep, Edit, Write, Bash, etc.) |
+| `provider` | - | Override provider for this step (`claude` or `codex`) |
+| `model` | - | Override model for this step |
 
 ## API Usage
 
@@ -375,6 +470,7 @@ This ensures the project works correctly in a clean Node.js 20 environment.
 - [Agent Guide](./docs/agents.md) - Configure custom agents
 - [Changelog](./CHANGELOG.md) - Version history
 - [Security Policy](./SECURITY.md) - Vulnerability reporting
+- [Blog: TAKT - AI Agent Orchestration](https://zenn.dev/nrs/articles/c6842288a526d7) - Design philosophy and practical usage guide (Japanese)
 
 ## License
 

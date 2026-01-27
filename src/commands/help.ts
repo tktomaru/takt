@@ -15,6 +15,7 @@ export function showHelp(): void {
 Usage:
   takt {task}             Execute task with current workflow (continues session)
   takt /run-tasks         Run all pending tasks from .takt/tasks/
+  takt /watch             Watch for tasks and auto-execute (stays resident)
   takt /add-task          Add a new task (interactive, YAML format)
   takt /switch            Switch workflow interactively
   takt /clear             Clear agent conversation sessions (reset to initial state)
@@ -26,6 +27,7 @@ Examples:
   takt /add-task "認証機能を追加する"   # Quick add task
   takt /add-task                        # Interactive task creation
   takt /clear                           # Clear sessions, start fresh
+  takt /watch                            # Watch & auto-execute tasks
   takt /refresh-builtin                 # Update builtin resources
   takt /switch
   takt /run-tasks
