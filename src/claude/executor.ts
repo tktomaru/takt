@@ -49,6 +49,10 @@ export interface ExecuteOptions {
   onAskUserQuestion?: AskUserQuestionHandler;
   /** Bypass all permission checks (sacrifice-my-pc mode) */
   bypassPermissions?: boolean;
+  /** Environment variables to pass to Claude process */
+  env?: Record<string, string | undefined>;
+  /** Extra CLI arguments for Claude */
+  extraArgs?: Record<string, string | null>;
 }
 
 /**
@@ -86,6 +90,8 @@ function buildSdkOptions(options: ExecuteOptions): Options {
     includePartialMessages: !!options.onStream,
     canUseTool,
     hooks,
+    env: options.env,
+    extraArgs: options.extraArgs,
   };
 
   if (options.systemPrompt) {

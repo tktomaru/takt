@@ -6,11 +6,8 @@
  * User input is always accepted and interrupts the current agent.
  */
 
-import * as readline from 'node:readline';
 import { WorkflowEngine } from '../workflow/engine.js';
 import type { WorkflowConfig, Language } from '../models/types.js';
-import type { IterationLimitRequest, UserInputRequest } from '../workflow/types.js';
-import { interruptAllQueries } from '../claude/query-manager.js';
 import type { StreamEvent } from '../claude/types.js';
 import {
   loadAgentSessions,
@@ -21,7 +18,6 @@ import {
 import {
   header,
   info,
-  warn,
   error,
   success,
   status,
@@ -42,7 +38,11 @@ import {
   logAgentStepComplete,
 } from '../utils/debug.js';
 import { notifySuccess, notifyError } from '../utils/notification.js';
-import { selectOption, promptInput } from '../prompt/index.js';
+import {
+  createInputHandler,
+  createUserInputHandler,
+  createIterationLimitHandler,
+} from './inputHandler.js';
 
 const log = createLogger('workflow');
 
@@ -113,49 +113,16 @@ export async function executeWorkflow(
   saveSessionLog(sessionLog, workflowSessionId, projectCwd);
   updateLatestPointer(sessionLog, workflowSessionId, projectCwd, { copyToPrevious: true });
 
-  // Track current agent for logging
-  const currentAgentRef: { name: string | null } = { name: null };
-
-  // User input queue for interrupts
-  const userInputQueue: string[] = [];
-  let inputListenerActive = true;
-
-  // Setup readline for background input monitoring
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    terminal: false,
-  });
-
-  // Show input prompt
-  const showPrompt = (): void => {
-    process.stdout.write('> ');
-  };
-
-  // Handle user input - interrupt current agent and queue input
-  rl.on('line', (input: string) => {
-    if (!inputListenerActive) return;
-
-    const trimmedInput = input.trim();
-    if (trimmedInput) {
-      userInputQueue.push(trimmedInput);
-      log.info('User input received, interrupting current agent', { input: trimmedInput });
-
-      // Interrupt all running queries to inject user input
-      interruptAllQueries();
-
-      // Write to current agent's log
-      if (currentAgentRef.name) {
-        writeAgentLog(currentAgentRef.name, `\n[USER_INPUT] ${trimmedInput}\n`);
-      }
-    }
-  });
+  // Setup input handler
+  const inputHandler = createInputHandler();
 
   // Create stream handler that writes to agent log file only (no console output)
   const streamHandler = (event: StreamEvent): void => {
+    const state = inputHandler.getState();
+    const agentName = state.currentAgentName;
+
     // Write to agent log file only
-    if (currentAgentRef.name) {
-      const agentName = currentAgentRef.name;
+    if (agentName) {
       switch (event.type) {
         case 'text':
           writeAgentLog(agentName, event.data.text);
@@ -195,71 +162,12 @@ export async function executeWorkflow(
         updateAgentSession(projectCwd, agentName, agentSessionId);
       };
 
-  // User input handler for BLOCKED status
-  const userInputHandler = async (
-    request: UserInputRequest
-  ): Promise<string | null> => {
-    // Check if we have queued input from interrupt
-    if (userInputQueue.length > 0) {
-      const queuedInput = userInputQueue.shift()!;
-      info(`Using queued input: ${queuedInput.slice(0, 50)}...`);
-      return queuedInput;
-    }
-
-    console.log();
-    warn(`Agent is blocked: ${request.step.name}`);
-    if (request.prompt) {
-      info(request.prompt);
-    }
-
-    const userInput = await promptInput('Your response (empty to abort)');
-    return userInput || null;
-  };
-
-  const iterationLimitHandler = async (
-    request: IterationLimitRequest
-  ): Promise<number | null> => {
-    console.log();
-    warn(
-      `最大イテレーションに到達しました (${request.currentIteration}/${request.maxIterations})`
-    );
-    info(`現在のステップ: ${request.currentStep}`);
-
-    const action = await selectOption('続行しますか？', [
-      {
-        label: '続行する（追加イテレーション数を入力）',
-        value: 'continue',
-        description: '入力した回数だけ上限を増やします',
-      },
-      { label: '終了する', value: 'stop' },
-    ]);
-
-    if (action !== 'continue') {
-      return null;
-    }
-
-    while (true) {
-      const input = await promptInput('追加するイテレーション数を入力してください（1以上）');
-      if (!input) {
-        return null;
-      }
-
-      const additionalIterations = Number.parseInt(input, 10);
-      if (Number.isInteger(additionalIterations) && additionalIterations > 0) {
-        workflowConfig.maxIterations += additionalIterations;
-        return additionalIterations;
-      }
-
-      warn('1以上の整数を入力してください。');
-    }
-  };
-
   const engine = new WorkflowEngine(workflowConfig, cwd, task, {
     onStream: streamHandler,
     initialSessions: savedSessions,
     onSessionUpdate: sessionUpdateHandler,
-    onIterationLimit: iterationLimitHandler,
-    onUserInput: userInputHandler,
+    onIterationLimit: createIterationLimitHandler(workflowConfig),
+    onUserInput: createUserInputHandler(inputHandler),
     projectCwd,
     language: options.language,
   });
@@ -273,15 +181,15 @@ export async function executeWorkflow(
     console.log(`[${iteration}/${workflowConfig.maxIterations}] ${step.name} (${step.agentDisplayName})`);
 
     // Initialize agent log and track current agent
-    currentAgentRef.name = step.agentDisplayName;
+    inputHandler.setCurrentAgent(step.agentDisplayName);
     if (iteration === 1) {
       initAgentLog(step.agentDisplayName);
     }
     logAgentStepStart(step.agentDisplayName, step.name, iteration);
 
     // Inject any queued user input
-    while (userInputQueue.length > 0) {
-      const queuedInput = userInputQueue.shift()!;
+    while (inputHandler.hasQueuedInput()) {
+      const queuedInput = inputHandler.dequeueInput()!;
       engine.addUserInput(queuedInput);
       info(`Injected user input: ${queuedInput.slice(0, 50)}...`);
     }
@@ -297,10 +205,11 @@ export async function executeWorkflow(
     });
 
     // Write step completion to agent log
-    if (currentAgentRef.name) {
-      logAgentStepComplete(currentAgentRef.name, response.status);
+    const state = inputHandler.getState();
+    if (state.currentAgentName) {
+      logAgentStepComplete(state.currentAgentName, response.status);
     }
-    currentAgentRef.name = null;
+    inputHandler.setCurrentAgent(null);
 
     // Minimal console output: just status
     status('Status', response.status);
@@ -315,7 +224,7 @@ export async function executeWorkflow(
     updateLatestPointer(sessionLog, workflowSessionId, projectCwd);
 
     // Show prompt for next input
-    showPrompt();
+    inputHandler.showPrompt();
   });
 
   engine.on('workflow:complete', (state) => {
@@ -354,13 +263,12 @@ export async function executeWorkflow(
   });
 
   // Show initial prompt
-  showPrompt();
+  inputHandler.showPrompt();
 
   const finalState = await engine.run();
 
-  // Cleanup readline
-  inputListenerActive = false;
-  rl.close();
+  // Cleanup input handler
+  inputHandler.close();
 
   return {
     success: finalState.status === 'completed',

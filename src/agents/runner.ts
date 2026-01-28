@@ -14,6 +14,7 @@ import { type StreamCallback, type PermissionHandler, type AskUserQuestionHandle
 import { loadCustomAgents, loadAgentPrompt } from '../config/loader.js';
 import { loadGlobalConfig } from '../config/globalConfig.js';
 import { loadProjectConfig } from '../config/projectConfig.js';
+import { getClaudeEnv, getClaudeExtraArgs } from '../config/env.js';
 import { getProvider, type ProviderType, type ProviderCallOptions } from '../providers/index.js';
 import type { AgentResponse, CustomAgentConfig, PermissionMode } from '../models/types.js';
 import { createLogger } from '../utils/debug.js';
@@ -41,6 +42,10 @@ export interface RunAgentOptions {
   onAskUserQuestion?: AskUserQuestionHandler;
   /** Bypass all permission checks (sacrifice-my-pc mode) */
   bypassPermissions?: boolean;
+  /** Environment variables to pass to the provider process */
+  env?: Record<string, string | undefined>;
+  /** Extra CLI arguments for the provider */
+  extraArgs?: Record<string, string | null>;
 }
 
 function resolveProvider(cwd: string, options?: RunAgentOptions, agentConfig?: CustomAgentConfig): ProviderType {
@@ -101,6 +106,10 @@ export async function runCustomAgent(
 ): Promise<AgentResponse> {
   const allowedTools = options.allowedTools ?? agentConfig.allowedTools;
 
+  // Get environment and extra args from .env
+  const env = options.env ?? getClaudeEnv();
+  const extraArgs = options.extraArgs ?? getClaudeExtraArgs();
+
   // If agent references a Claude Code agent
   if (agentConfig.claudeAgent) {
     const callOptions: ClaudeCallOptions = {
@@ -113,6 +122,8 @@ export async function runCustomAgent(
       onPermissionRequest: options.onPermissionRequest,
       onAskUserQuestion: options.onAskUserQuestion,
       bypassPermissions: options.bypassPermissions,
+      env,
+      extraArgs,
     };
     return callClaudeAgent(agentConfig.claudeAgent, task, callOptions);
   }
@@ -129,6 +140,8 @@ export async function runCustomAgent(
       onPermissionRequest: options.onPermissionRequest,
       onAskUserQuestion: options.onAskUserQuestion,
       bypassPermissions: options.bypassPermissions,
+      env,
+      extraArgs,
     };
     return callClaudeSkill(agentConfig.claudeSkill, task, callOptions);
   }
@@ -155,6 +168,8 @@ export async function runCustomAgent(
     onPermissionRequest: options.onPermissionRequest,
     onAskUserQuestion: options.onAskUserQuestion,
     bypassPermissions: options.bypassPermissions,
+    env,
+    extraArgs,
   };
 
   return provider.callCustom(agentConfig.name, task, systemPrompt, callOptions);
@@ -212,6 +227,10 @@ export async function runAgent(
     permissionMode: options.permissionMode,
   });
 
+  // Get environment and extra args from .env
+  const env = options.env ?? getClaudeEnv();
+  const extraArgs = options.extraArgs ?? getClaudeExtraArgs();
+
   // If agentPath is provided (from workflow), use it to load prompt
   if (options.agentPath) {
     if (!existsSync(options.agentPath)) {
@@ -238,6 +257,8 @@ export async function runAgent(
       onPermissionRequest: options.onPermissionRequest,
       onAskUserQuestion: options.onAskUserQuestion,
       bypassPermissions: options.bypassPermissions,
+      env,
+      extraArgs,
     };
 
     return provider.call(agentName, task, callOptions);

@@ -19,6 +19,7 @@ import {
   initProjectDirs,
   loadGlobalConfig,
   getEffectiveDebugConfig,
+  loadEnv,
 } from './config/index.js';
 import { clearAgentSessions, getCurrentWorkflow, isVerboseMode } from './config/paths.js';
 import { info, error, success, setLogLevel } from './utils/ui.js';
@@ -95,6 +96,9 @@ program
 
     // Initialize project directories (.takt/)
     initProjectDirs(cwd);
+
+    // Load .env file if present
+    loadEnv(cwd);
 
     // Determine verbose mode and initialize logging
     const verbose = isVerboseMode(cwd);

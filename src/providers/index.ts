@@ -25,6 +25,10 @@ export interface ProviderCallOptions {
   onPermissionRequest?: PermissionHandler;
   onAskUserQuestion?: AskUserQuestionHandler;
   bypassPermissions?: boolean;
+  /** Environment variables to pass to the provider process */
+  env?: Record<string, string | undefined>;
+  /** Extra CLI arguments for the provider */
+  extraArgs?: Record<string, string | null>;
 }
 
 /** Provider interface - all providers must implement this */

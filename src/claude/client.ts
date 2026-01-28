@@ -33,6 +33,10 @@ export interface ClaudeCallOptions {
   onAskUserQuestion?: AskUserQuestionHandler;
   /** Bypass all permission checks (sacrifice-my-pc mode) */
   bypassPermissions?: boolean;
+  /** Environment variables to pass to Claude process */
+  env?: Record<string, string | undefined>;
+  /** Extra CLI arguments for Claude */
+  extraArgs?: Record<string, string | null>;
 }
 
 /** Detect status from agent output content */
@@ -122,6 +126,8 @@ export async function callClaude(
     onPermissionRequest: options.onPermissionRequest,
     onAskUserQuestion: options.onAskUserQuestion,
     bypassPermissions: options.bypassPermissions,
+    env: options.env,
+    extraArgs: options.extraArgs,
   };
 
   const result = await executeClaudeCli(prompt, spawnOptions);
@@ -161,6 +167,8 @@ export async function callClaudeCustom(
     onPermissionRequest: options.onPermissionRequest,
     onAskUserQuestion: options.onAskUserQuestion,
     bypassPermissions: options.bypassPermissions,
+    env: options.env,
+    extraArgs: options.extraArgs,
   };
 
   const result = await executeClaudeCli(prompt, spawnOptions);
@@ -215,6 +223,8 @@ export async function callClaudeSkill(
     onPermissionRequest: options.onPermissionRequest,
     onAskUserQuestion: options.onAskUserQuestion,
     bypassPermissions: options.bypassPermissions,
+    env: options.env,
+    extraArgs: options.extraArgs,
   };
 
   const result = await executeClaudeCli(fullPrompt, spawnOptions);

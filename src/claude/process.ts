@@ -69,6 +69,10 @@ export interface ClaudeSpawnOptions {
   onAskUserQuestion?: AskUserQuestionHandler;
   /** Bypass all permission checks (sacrifice-my-pc mode) */
   bypassPermissions?: boolean;
+  /** Environment variables to pass to Claude process */
+  env?: Record<string, string | undefined>;
+  /** Extra CLI arguments for Claude */
+  extraArgs?: Record<string, string | null>;
 }
 
 /**

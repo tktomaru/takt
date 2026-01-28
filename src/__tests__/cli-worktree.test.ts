@@ -47,6 +47,7 @@ vi.mock('../config/index.js', () => ({
   initProjectDirs: vi.fn(),
   loadGlobalConfig: vi.fn(() => ({ logLevel: 'info' })),
   getEffectiveDebugConfig: vi.fn(),
+  loadEnv: vi.fn(),
 }));
 
 vi.mock('../config/paths.js', () => ({

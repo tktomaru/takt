@@ -21,6 +21,8 @@ export class ClaudeProvider implements Provider {
       onPermissionRequest: options.onPermissionRequest,
       onAskUserQuestion: options.onAskUserQuestion,
       bypassPermissions: options.bypassPermissions,
+      env: options.env,
+      extraArgs: options.extraArgs,
     };
 
     return callClaude(agentName, prompt, callOptions);
@@ -38,6 +40,8 @@ export class ClaudeProvider implements Provider {
       onPermissionRequest: options.onPermissionRequest,
       onAskUserQuestion: options.onAskUserQuestion,
       bypassPermissions: options.bypassPermissions,
+      env: options.env,
+      extraArgs: options.extraArgs,
     };
 
     return callClaudeCustom(agentName, prompt, systemPrompt, callOptions);
