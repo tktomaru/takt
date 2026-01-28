@@ -3,7 +3,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { buildInstruction, type InstructionContext } from '../workflow/instruction-builder.js';
+import {
+  buildInstruction,
+  buildExecutionMetadata,
+  renderExecutionMetadata,
+  type InstructionContext,
+} from '../workflow/instruction-builder.js';
 import type { WorkflowStep } from '../models/types.js';
 
 function createMinimalStep(template: string): WorkflowStep {
@@ -30,6 +35,60 @@ function createMinimalContext(overrides: Partial<InstructionContext> = {}): Inst
 }
 
 describe('instruction-builder', () => {
+  describe('execution context metadata', () => {
+    it('should always include Working Directory', () => {
+      const step = createMinimalStep('Do some work');
+      const context = createMinimalContext({ cwd: '/project' });
+
+      const result = buildInstruction(step, context);
+
+      expect(result).toContain('## Execution Context');
+      expect(result).toContain('Working Directory: /project');
+      expect(result).toContain('Do some work');
+    });
+
+    it('should include Project Root and Mode when cwd !== projectCwd', () => {
+      const step = createMinimalStep('Do some work');
+      const context = createMinimalContext({
+        cwd: '/worktree-path',
+        projectCwd: '/project-path',
+      });
+
+      const result = buildInstruction(step, context);
+
+      expect(result).toContain('## Execution Context');
+      expect(result).toContain('Working Directory: /worktree-path');
+      expect(result).toContain('Project Root: /project-path');
+      expect(result).toContain('Mode: worktree');
+      expect(result).toContain('Do some work');
+    });
+
+    it('should NOT include Project Root or Mode when cwd === projectCwd', () => {
+      const step = createMinimalStep('Do some work');
+      const context = createMinimalContext({
+        cwd: '/project',
+        projectCwd: '/project',
+      });
+
+      const result = buildInstruction(step, context);
+
+      expect(result).toContain('Working Directory: /project');
+      expect(result).not.toContain('Project Root');
+      expect(result).not.toContain('Mode:');
+    });
+
+    it('should NOT include Project Root or Mode when projectCwd is not set', () => {
+      const step = createMinimalStep('Do some work');
+      const context = createMinimalContext({ cwd: '/project' });
+
+      const result = buildInstruction(step, context);
+
+      expect(result).toContain('Working Directory: /project');
+      expect(result).not.toContain('Project Root');
+      expect(result).not.toContain('Mode:');
+    });
+  });
+
   describe('report_dir replacement', () => {
     it('should replace .takt/reports/{report_dir} with full absolute path', () => {
       const step = createMinimalStep(
@@ -42,7 +101,7 @@ describe('instruction-builder', () => {
 
       const result = buildInstruction(step, context);
 
-      expect(result).toBe(
+      expect(result).toContain(
         '- Report Directory: /project/.takt/reports/20260128-test-report/'
       );
     });
@@ -59,11 +118,11 @@ describe('instruction-builder', () => {
 
       const result = buildInstruction(step, context);
 
-      expect(result).toBe(
+      expect(result).toContain(
         '- Report: /project/.takt/reports/20260128-worktree-report/00-plan.md'
       );
-      // Should NOT contain the worktree path
-      expect(result).not.toContain('/project/.takt/worktrees/');
+      expect(result).toContain('Working Directory: /project/.takt/worktrees/my-task');
+      expect(result).toContain('Project Root: /project');
     });
 
     it('should replace multiple .takt/reports/{report_dir} occurrences', () => {
@@ -92,7 +151,7 @@ describe('instruction-builder', () => {
 
       const result = buildInstruction(step, context);
 
-      expect(result).toBe('Report dir name: 20260128-standalone');
+      expect(result).toContain('Report dir name: 20260128-standalone');
     });
 
     it('should fall back to cwd when projectCwd is not provided', () => {
@@ -103,13 +162,82 @@ describe('instruction-builder', () => {
         cwd: '/fallback-project',
         reportDir: '20260128-fallback',
       });
-      // projectCwd intentionally omitted
 
       const result = buildInstruction(step, context);
 
-      expect(result).toBe(
+      expect(result).toContain(
         '- Dir: /fallback-project/.takt/reports/20260128-fallback/'
       );
+    });
+  });
+
+  describe('buildExecutionMetadata', () => {
+    it('should set workingDirectory and omit projectRoot in normal mode', () => {
+      const context = createMinimalContext({ cwd: '/project' });
+      const metadata = buildExecutionMetadata(context);
+
+      expect(metadata.workingDirectory).toBe('/project');
+      expect(metadata.projectRoot).toBeUndefined();
+    });
+
+    it('should set projectRoot in worktree mode', () => {
+      const context = createMinimalContext({
+        cwd: '/worktree-path',
+        projectCwd: '/project-path',
+      });
+      const metadata = buildExecutionMetadata(context);
+
+      expect(metadata.workingDirectory).toBe('/worktree-path');
+      expect(metadata.projectRoot).toBe('/project-path');
+    });
+
+    it('should omit projectRoot when projectCwd is not set', () => {
+      const context = createMinimalContext({ cwd: '/project' });
+      // projectCwd is undefined by default
+      const metadata = buildExecutionMetadata(context);
+
+      expect(metadata.workingDirectory).toBe('/project');
+      expect(metadata.projectRoot).toBeUndefined();
+    });
+
+    it('should omit projectRoot when cwd equals projectCwd', () => {
+      const context = createMinimalContext({
+        cwd: '/same-path',
+        projectCwd: '/same-path',
+      });
+      const metadata = buildExecutionMetadata(context);
+
+      expect(metadata.workingDirectory).toBe('/same-path');
+      expect(metadata.projectRoot).toBeUndefined();
+    });
+  });
+
+  describe('renderExecutionMetadata', () => {
+    it('should render normal mode without Project Root or Mode', () => {
+      const rendered = renderExecutionMetadata({ workingDirectory: '/project' });
+
+      expect(rendered).toContain('## Execution Context');
+      expect(rendered).toContain('- Working Directory: /project');
+      expect(rendered).not.toContain('Project Root');
+      expect(rendered).not.toContain('Mode:');
+    });
+
+    it('should render worktree mode with Project Root and Mode', () => {
+      const rendered = renderExecutionMetadata({
+        workingDirectory: '/worktree',
+        projectRoot: '/project',
+      });
+
+      expect(rendered).toContain('## Execution Context');
+      expect(rendered).toContain('- Working Directory: /worktree');
+      expect(rendered).toContain('- Project Root: /project');
+      expect(rendered).toContain('- Mode: worktree');
+    });
+
+    it('should end with a trailing empty line', () => {
+      const rendered = renderExecutionMetadata({ workingDirectory: '/project' });
+
+      expect(rendered).toMatch(/\n$/);
     });
   });
 
@@ -129,7 +257,7 @@ describe('instruction-builder', () => {
 
       const result = buildInstruction(step, context);
 
-      expect(result).toBe('Step 3/20');
+      expect(result).toContain('Step 3/20');
     });
 
     it('should replace {step_iteration}', () => {
@@ -138,7 +266,7 @@ describe('instruction-builder', () => {
 
       const result = buildInstruction(step, context);
 
-      expect(result).toBe('Run #2');
+      expect(result).toContain('Run #2');
     });
   });
 });

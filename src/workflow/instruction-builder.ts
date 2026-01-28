@@ -33,6 +33,50 @@ export interface InstructionContext {
   reportDir?: string;
 }
 
+/** Execution environment metadata prepended to agent instructions */
+export interface ExecutionMetadata {
+  /** The agent's working directory (may be a worktree) */
+  readonly workingDirectory: string;
+  /** Project root where .takt/ lives. Present only in worktree mode. */
+  readonly projectRoot?: string;
+}
+
+/**
+ * Build execution metadata from instruction context.
+ *
+ * Pure function: InstructionContext → ExecutionMetadata.
+ * Sets `projectRoot` only when cwd differs from projectCwd (worktree mode).
+ */
+export function buildExecutionMetadata(context: InstructionContext): ExecutionMetadata {
+  const projectRoot = context.projectCwd ?? context.cwd;
+  const isWorktree = context.cwd !== projectRoot;
+
+  return {
+    workingDirectory: context.cwd,
+    ...(isWorktree ? { projectRoot } : {}),
+  };
+}
+
+/**
+ * Render execution metadata as a markdown string.
+ *
+ * Pure function: ExecutionMetadata → string.
+ * Always includes `## Execution Context` + `Working Directory`.
+ * Adds `Project Root` and `Mode` only in worktree mode (when projectRoot is present).
+ */
+export function renderExecutionMetadata(metadata: ExecutionMetadata): string {
+  const lines = [
+    '## Execution Context',
+    `- Working Directory: ${metadata.workingDirectory}`,
+  ];
+  if (metadata.projectRoot !== undefined) {
+    lines.push(`- Project Root: ${metadata.projectRoot}`);
+    lines.push('- Mode: worktree (source edits in Working Directory, reports in Project Root)');
+  }
+  lines.push('');
+  return lines.join('\n');
+}
+
 /**
  * Escape special characters in dynamic content to prevent template injection.
  */
@@ -100,6 +144,10 @@ export function buildInstruction(
     instruction = instruction.replace(/\.takt\/reports\/\{report_dir\}/g, reportDirFullPath);
     instruction = instruction.replace(/\{report_dir\}/g, context.reportDir);
   }
+
+  // Prepend execution context metadata.
+  const metadata = buildExecutionMetadata(context);
+  instruction = `${renderExecutionMetadata(metadata)}\n${instruction}`;
 
   // Append status_rules_prompt if present
   if (step.statusRulesPrompt) {

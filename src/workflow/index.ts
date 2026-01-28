@@ -37,7 +37,13 @@ export {
 } from './state-manager.js';
 
 // Instruction building
-export { buildInstruction, type InstructionContext } from './instruction-builder.js';
+export {
+  buildInstruction,
+  buildExecutionMetadata,
+  renderExecutionMetadata,
+  type InstructionContext,
+  type ExecutionMetadata,
+} from './instruction-builder.js';
 
 // Blocked handling
 export { handleBlocked, type BlockedHandlerResult } from './blocked-handler.js';
