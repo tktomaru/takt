@@ -2,13 +2,15 @@
  * User input handling for workflow execution
  *
  * Manages readline interface, input queue, and interrupt handling.
+ * Supports slash commands (/open, /kill, /help) during workflow execution.
  */
 
 import * as readline from 'node:readline';
 import { interruptAllQueries } from '../claude/query-manager.js';
 import { writeAgentLog, createLogger } from '../utils/debug.js';
-import { info, warn } from '../utils/ui.js';
+import { info, warn, success } from '../utils/ui.js';
 import { selectOption, promptInput } from '../prompt/index.js';
+import { createTmuxSession, killTmuxMonitor } from './open.js';
 import type { IterationLimitRequest, UserInputRequest } from '../workflow/types.js';
 import type { WorkflowConfig } from '../models/types.js';
 
@@ -43,8 +45,9 @@ export interface InputHandler {
 /**
  * Create an input handler for workflow execution.
  * Sets up readline for background input monitoring and interrupt handling.
+ * @param cwd Current working directory (for slash commands)
  */
-export function createInputHandler(): InputHandler {
+export function createInputHandler(cwd: string): InputHandler {
   const state: InputHandlerState = {
     inputQueue: [],
     isActive: true,
@@ -58,22 +61,55 @@ export function createInputHandler(): InputHandler {
     terminal: false,
   });
 
-  // Handle user input - interrupt current agent and queue input
+  // Handle user input - check for slash commands or queue for agent
   rl.on('line', (input: string) => {
     if (!state.isActive) return;
 
     const trimmedInput = input.trim();
-    if (trimmedInput) {
-      state.inputQueue.push(trimmedInput);
-      log.info('User input received, interrupting current agent', { input: trimmedInput });
+    if (!trimmedInput) return;
 
-      // Interrupt all running queries to inject user input
-      interruptAllQueries();
+    // Handle slash commands
+    if (trimmedInput.startsWith('/')) {
+      const command = trimmedInput.slice(1).toLowerCase();
 
-      // Write to current agent's log
-      if (state.currentAgentName) {
-        writeAgentLog(state.currentAgentName, `\n[USER_INPUT] ${trimmedInput}\n`);
+      switch (command) {
+        case 'open':
+          if (createTmuxSession(cwd)) {
+            success('tmux session created. Run: tmux attach -t takt-monitor');
+          } else {
+            warn('Failed to create tmux session. Is tmux installed?');
+          }
+          return;
+
+        case 'kill':
+        case 'close':
+          killTmuxMonitor();
+          return;
+
+        case 'help':
+          info('Available commands during workflow:');
+          info('  /open  - Create tmux monitor session');
+          info('  /kill  - Kill tmux monitor session');
+          info('  /help  - Show this help');
+          info('  (other input) - Send to agent as feedback');
+          return;
+
+        default:
+          // Unknown slash command - treat as agent input
+          break;
       }
+    }
+
+    // Queue input for agent and interrupt
+    state.inputQueue.push(trimmedInput);
+    log.info('User input received, interrupting current agent', { input: trimmedInput });
+
+    // Interrupt all running queries to inject user input
+    interruptAllQueries();
+
+    // Write to current agent's log
+    if (state.currentAgentName) {
+      writeAgentLog(state.currentAgentName, `\n[USER_INPUT] ${trimmedInput}\n`);
     }
   });
 

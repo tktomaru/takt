@@ -178,7 +178,8 @@ program
           return;
 
         case 'open':
-          await openTmuxMonitor(cwd);
+          // /open [workflow-name] - open tmux monitor for specified workflow
+          await openTmuxMonitor(cwd, args[0]);
           return;
 
         case 'close':

@@ -102,7 +102,6 @@ export async function executeWorkflow(
   log.debug('Continuing session (use /clear to reset)');
 
   header(`${headerPrefix} ${workflowConfig.name}`);
-  info('Use /open in another terminal to monitor agent logs');
   info('Type your input anytime to interrupt and provide feedback');
   console.log();
 
@@ -113,8 +112,8 @@ export async function executeWorkflow(
   saveSessionLog(sessionLog, workflowSessionId, projectCwd);
   updateLatestPointer(sessionLog, workflowSessionId, projectCwd, { copyToPrevious: true });
 
-  // Setup input handler
-  const inputHandler = createInputHandler();
+  // Setup input handler (pass cwd for slash commands like /open)
+  const inputHandler = createInputHandler(cwd);
 
   // Create stream handler that writes to agent log file only (no console output)
   const streamHandler = (event: StreamEvent): void => {
