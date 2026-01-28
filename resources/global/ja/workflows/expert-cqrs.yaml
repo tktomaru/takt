@@ -508,7 +508,7 @@ steps:
   # Phase 3: Frontend Review
   # ===========================================
   - name: frontend_review
-    agent: ~/.takt/agents/expert-cqrs/frontend-reviewer.md
+    agent: ~/.takt/agents/expert/frontend-reviewer.md
     allowed_tools:
       - Read
       - Glob
@@ -796,7 +796,7 @@ steps:
   # Phase 5: Security Review
   # ===========================================
   - name: security_review
-    agent: ~/.takt/agents/expert-cqrs/security-reviewer.md
+    agent: ~/.takt/agents/expert/security-reviewer.md
     allowed_tools:
       - Read
       - Glob
@@ -950,7 +950,7 @@ steps:
   # Phase 6: QA Review
   # ===========================================
   - name: qa_review
-    agent: ~/.takt/agents/expert-cqrs/qa-reviewer.md
+    agent: ~/.takt/agents/expert/qa-reviewer.md
     allowed_tools:
       - Read
       - Glob
@@ -1109,7 +1109,7 @@ steps:
   # Phase 7: Supervision
   # ===========================================
   - name: supervise
-    agent: ~/.takt/agents/expert-cqrs/supervisor.md
+    agent: ~/.takt/agents/expert/supervisor.md
     allowed_tools:
       - Read
       - Glob
