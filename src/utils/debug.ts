@@ -173,3 +173,79 @@ export function createLogger(component: string) {
     exit: (funcName: string, result?: unknown) => traceExit(component, funcName, result),
   };
 }
+
+// ============================================================
+// Agent-specific logging
+// ============================================================
+
+/** Get the agents logs directory */
+export function getAgentLogsDir(): string {
+  return join(homedir(), '.takt', 'logs', 'agents');
+}
+
+/** Get the log file path for a specific agent */
+export function getAgentLogFile(agentName: string): string {
+  // Normalize agent name (remove path components, keep only base name)
+  const normalizedName = agentName.replace(/[/\\]/g, '-').replace(/\.md$/, '');
+  return join(getAgentLogsDir(), `${normalizedName}.log`);
+}
+
+/** Ensure agent logs directory exists */
+function ensureAgentLogsDir(): void {
+  const dir = getAgentLogsDir();
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+}
+
+/** Initialize an agent log file with header */
+export function initAgentLog(agentName: string): string {
+  ensureAgentLogsDir();
+  const logFile = getAgentLogFile(agentName);
+
+  const header = [
+    '='.repeat(60),
+    `Agent: ${agentName}`,
+    `Started: ${new Date().toISOString()}`,
+    '='.repeat(60),
+    '',
+  ].join('\n');
+
+  writeFileSync(logFile, header, 'utf-8');
+  return logFile;
+}
+
+/** Write content to an agent's log file */
+export function writeAgentLog(agentName: string, content: string): void {
+  ensureAgentLogsDir();
+  const logFile = getAgentLogFile(agentName);
+
+  try {
+    appendFileSync(logFile, content, 'utf-8');
+  } catch {
+    // Silently fail
+  }
+}
+
+/** Write agent step start marker */
+export function logAgentStepStart(agentName: string, stepName: string, iteration: number): void {
+  const content = [
+    '',
+    '-'.repeat(40),
+    `Step: ${stepName} (iteration ${iteration})`,
+    `Time: ${new Date().toISOString()}`,
+    '-'.repeat(40),
+    '',
+  ].join('\n');
+  writeAgentLog(agentName, content);
+}
+
+/** Write agent step complete marker */
+export function logAgentStepComplete(agentName: string, status: string): void {
+  const content = [
+    '',
+    `>>> Step completed with status: ${status}`,
+    '',
+  ].join('\n');
+  writeAgentLog(agentName, content);
+}

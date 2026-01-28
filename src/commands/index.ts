@@ -12,3 +12,4 @@ export { withAgentSession } from './session.js';
 export { switchWorkflow } from './workflow.js';
 export { switchConfig, getCurrentPermissionMode, setPermissionMode, type PermissionMode } from './config.js';
 export { reviewTasks } from './reviewTasks.js';
+export { openTmuxMonitor, killTmuxMonitor, isTmuxInstalled, tmuxSessionExists } from './open.js';

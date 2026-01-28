@@ -14,6 +14,12 @@ import {
   debugLog,
   infoLog,
   errorLog,
+  getAgentLogsDir,
+  getAgentLogFile,
+  initAgentLog,
+  writeAgentLog,
+  logAgentStepStart,
+  logAgentStepComplete,
 } from '../utils/debug.js';
 import { existsSync, readFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -228,6 +234,96 @@ describe('debug logging', () => {
       } finally {
         stderrSpy.mockRestore();
       }
+    });
+  });
+
+  describe('agent-specific logging', () => {
+    const testAgentLogsDir = getAgentLogsDir();
+
+    afterEach(() => {
+      // Clean up test agent logs
+      try {
+        const testLogFile = getAgentLogFile('test-agent');
+        if (existsSync(testLogFile)) {
+          rmSync(testLogFile);
+        }
+      } catch {
+        // Ignore cleanup errors
+      }
+    });
+
+    describe('getAgentLogsDir', () => {
+      it('should return path under ~/.takt/logs/agents', () => {
+        const dir = getAgentLogsDir();
+        expect(dir).toContain('.takt');
+        expect(dir).toContain('logs');
+        expect(dir).toContain('agents');
+      });
+    });
+
+    describe('getAgentLogFile', () => {
+      it('should return path for agent log file', () => {
+        const logFile = getAgentLogFile('coder');
+        expect(logFile).toContain('coder.log');
+      });
+
+      it('should normalize agent names with path separators', () => {
+        const logFile = getAgentLogFile('default/coder');
+        expect(logFile).toContain('default-coder.log');
+      });
+
+      it('should remove .md extension from agent names', () => {
+        const logFile = getAgentLogFile('coder.md');
+        expect(logFile).toContain('coder.log');
+        expect(logFile).not.toContain('.md');
+      });
+    });
+
+    describe('initAgentLog', () => {
+      it('should create agent log file with header', () => {
+        const logFile = initAgentLog('test-agent');
+        expect(existsSync(logFile)).toBe(true);
+
+        const content = readFileSync(logFile, 'utf-8');
+        expect(content).toContain('Agent: test-agent');
+        expect(content).toContain('Started:');
+      });
+    });
+
+    describe('writeAgentLog', () => {
+      it('should append content to agent log file', () => {
+        initAgentLog('test-agent');
+        writeAgentLog('test-agent', 'Test content\n');
+        writeAgentLog('test-agent', 'More content\n');
+
+        const logFile = getAgentLogFile('test-agent');
+        const content = readFileSync(logFile, 'utf-8');
+        expect(content).toContain('Test content');
+        expect(content).toContain('More content');
+      });
+    });
+
+    describe('logAgentStepStart', () => {
+      it('should write step start marker with iteration', () => {
+        initAgentLog('test-agent');
+        logAgentStepStart('test-agent', 'implement', 3);
+
+        const logFile = getAgentLogFile('test-agent');
+        const content = readFileSync(logFile, 'utf-8');
+        expect(content).toContain('Step: implement');
+        expect(content).toContain('iteration 3');
+      });
+    });
+
+    describe('logAgentStepComplete', () => {
+      it('should write step completion with status', () => {
+        initAgentLog('test-agent');
+        logAgentStepComplete('test-agent', 'done');
+
+        const logFile = getAgentLogFile('test-agent');
+        const content = readFileSync(logFile, 'utf-8');
+        expect(content).toContain('completed with status: done');
+      });
     });
   });
 });

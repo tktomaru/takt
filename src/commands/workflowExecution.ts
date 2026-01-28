@@ -28,7 +28,13 @@ import {
   saveSessionLog,
   updateLatestPointer,
 } from '../utils/session.js';
-import { createLogger } from '../utils/debug.js';
+import {
+  createLogger,
+  initAgentLog,
+  writeAgentLog,
+  logAgentStepStart,
+  logAgentStepComplete,
+} from '../utils/debug.js';
 import { notifySuccess, notifyError } from '../utils/notification.js';
 import { selectOption, promptInput } from '../prompt/index.js';
 
@@ -99,10 +105,34 @@ export async function executeWorkflow(
   // Track current display for streaming
   const displayRef: { current: StreamDisplay | null } = { current: null };
 
-  // Create stream handler that delegates to current display
+  // Track current agent for logging
+  const currentAgentRef: { name: string | null } = { name: null };
+
+  // Create stream handler that delegates to current display and writes to agent log
   const streamHandler = (
     event: Parameters<ReturnType<StreamDisplay['createHandler']>>[0]
   ): void => {
+    // Write to agent log file
+    if (currentAgentRef.name) {
+      const agentName = currentAgentRef.name;
+      switch (event.type) {
+        case 'text':
+          writeAgentLog(agentName, event.data.text);
+          break;
+        case 'thinking':
+          writeAgentLog(agentName, `[thinking] ${event.data.thinking}`);
+          break;
+        case 'tool_use':
+          writeAgentLog(agentName, `\n[tool] ${event.data.tool}: ${JSON.stringify(event.data.input).slice(0, 200)}\n`);
+          break;
+        case 'tool_result':
+          if (event.data.isError) {
+            writeAgentLog(agentName, `[tool_error] ${event.data.content.slice(0, 500)}\n`);
+          }
+          break;
+      }
+    }
+
     if (!displayRef.current) return;
     if (event.type === 'result') return;
     displayRef.current.createHandler()(event);
@@ -182,6 +212,13 @@ export async function executeWorkflow(
     log.debug('Step starting', { step: step.name, agent: step.agentDisplayName, iteration });
     info(`[${iteration}/${workflowConfig.maxIterations}] ${step.name} (${step.agentDisplayName})`);
     displayRef.current = new StreamDisplay(step.agentDisplayName);
+
+    // Initialize agent log and track current agent
+    currentAgentRef.name = step.agentDisplayName;
+    if (iteration === 1) {
+      initAgentLog(step.agentDisplayName);
+    }
+    logAgentStepStart(step.agentDisplayName, step.name, iteration);
   });
 
   engine.on('step:complete', (step, response) => {
@@ -192,6 +229,13 @@ export async function executeWorkflow(
       sessionId: response.sessionId,
       error: response.error,
     });
+
+    // Write step completion to agent log
+    if (currentAgentRef.name) {
+      logAgentStepComplete(currentAgentRef.name, response.status);
+    }
+    currentAgentRef.name = null;
+
     if (displayRef.current) {
       displayRef.current.flush();
       displayRef.current = null;

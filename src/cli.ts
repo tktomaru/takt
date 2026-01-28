@@ -33,6 +33,8 @@ import {
   refreshBuiltin,
   watchTasks,
   reviewTasks,
+  openTmuxMonitor,
+  killTmuxMonitor,
 } from './commands/index.js';
 import { listWorkflows } from './config/workflowLoader.js';
 import { selectOptionWithDefault, confirm } from './prompt/index.js';
@@ -171,9 +173,17 @@ program
           await reviewTasks(cwd);
           return;
 
+        case 'open':
+          await openTmuxMonitor(cwd);
+          return;
+
+        case 'close':
+          killTmuxMonitor();
+          return;
+
         default:
           error(`Unknown command: /${command}`);
-          info('Available: /run-tasks (/run), /watch, /add-task (/add), /review-tasks (/review), /switch (/sw), /clear, /refresh-builtin, /help, /config');
+          info('Available: /run-tasks (/run), /watch, /add-task (/add), /review-tasks (/review), /switch (/sw), /clear, /refresh-builtin, /open, /close, /help, /config');
           process.exit(1);
       }
     }
