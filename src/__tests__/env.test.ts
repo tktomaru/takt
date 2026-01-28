@@ -10,6 +10,7 @@ describe('getClaudeExtraArgs', () => {
 
   beforeEach(() => {
     // Clear relevant env vars before each test
+    delete process.env.MODEL;
     delete process.env.CLAUDE_MODEL;
     delete process.env.CLAUDE_EXTRA_ARGS;
   });
@@ -28,6 +29,19 @@ describe('getClaudeExtraArgs', () => {
     process.env.CLAUDE_MODEL = 'claude-sonnet-4-20250514';
     const result = getClaudeExtraArgs();
     expect(result).toEqual({ model: 'claude-sonnet-4-20250514' });
+  });
+
+  it('includes model when MODEL is set (Ollama compatibility)', () => {
+    process.env.MODEL = 'gpt-oss:20b';
+    const result = getClaudeExtraArgs();
+    expect(result).toEqual({ model: 'gpt-oss:20b' });
+  });
+
+  it('MODEL takes precedence over CLAUDE_MODEL', () => {
+    process.env.MODEL = 'local-model';
+    process.env.CLAUDE_MODEL = 'claude-model';
+    const result = getClaudeExtraArgs();
+    expect(result).toEqual({ model: 'local-model' });
   });
 
   it('parses CLAUDE_EXTRA_ARGS as JSON', () => {
@@ -71,6 +85,8 @@ describe('getClaudeEnv', () => {
   beforeEach(() => {
     // Clear relevant env vars before each test
     delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.ANTHROPIC_BASE_URL;
+    delete process.env.ANTHROPIC_AUTH_TOKEN;
     // Clear any CLAUDE_ENV_ prefixed vars
     for (const key of Object.keys(process.env)) {
       if (key.startsWith('CLAUDE_ENV_')) {
@@ -93,6 +109,36 @@ describe('getClaudeEnv', () => {
     process.env.ANTHROPIC_API_KEY = 'sk-ant-test-key';
     const result = getClaudeEnv();
     expect(result).toEqual({ ANTHROPIC_API_KEY: 'sk-ant-test-key' });
+  });
+
+  it('includes empty ANTHROPIC_API_KEY for local models', () => {
+    process.env.ANTHROPIC_API_KEY = '';
+    const result = getClaudeEnv();
+    expect(result).toEqual({ ANTHROPIC_API_KEY: '' });
+  });
+
+  it('includes ANTHROPIC_BASE_URL when set', () => {
+    process.env.ANTHROPIC_BASE_URL = 'http://localhost:11434';
+    const result = getClaudeEnv();
+    expect(result).toEqual({ ANTHROPIC_BASE_URL: 'http://localhost:11434' });
+  });
+
+  it('includes ANTHROPIC_AUTH_TOKEN when set', () => {
+    process.env.ANTHROPIC_AUTH_TOKEN = 'ollama';
+    const result = getClaudeEnv();
+    expect(result).toEqual({ ANTHROPIC_AUTH_TOKEN: 'ollama' });
+  });
+
+  it('includes all Anthropic settings for Ollama setup', () => {
+    process.env.ANTHROPIC_API_KEY = '';
+    process.env.ANTHROPIC_BASE_URL = 'http://localhost:11434';
+    process.env.ANTHROPIC_AUTH_TOKEN = 'ollama';
+    const result = getClaudeEnv();
+    expect(result).toEqual({
+      ANTHROPIC_API_KEY: '',
+      ANTHROPIC_BASE_URL: 'http://localhost:11434',
+      ANTHROPIC_AUTH_TOKEN: 'ollama',
+    });
   });
 
   it('strips CLAUDE_ENV_ prefix and includes the value', () => {

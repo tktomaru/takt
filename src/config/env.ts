@@ -25,15 +25,16 @@ export function loadEnv(projectDir: string): void {
  * These are passed to the SDK via the extraArgs option.
  *
  * Supported environment variables:
- * - CLAUDE_MODEL: Model name override
+ * - MODEL or CLAUDE_MODEL: Model name override
  * - CLAUDE_EXTRA_ARGS: JSON object of additional arguments
  */
 export function getClaudeExtraArgs(): Record<string, string | null> {
   const extraArgs: Record<string, string | null> = {};
 
-  // Model override
-  if (process.env.CLAUDE_MODEL) {
-    extraArgs['model'] = process.env.CLAUDE_MODEL;
+  // Model override (MODEL takes precedence over CLAUDE_MODEL for Ollama compatibility)
+  const model = process.env.MODEL ?? process.env.CLAUDE_MODEL;
+  if (model) {
+    extraArgs['model'] = model;
   }
 
   // Parse additional args from JSON if provided
@@ -53,14 +54,27 @@ export function getClaudeExtraArgs(): Record<string, string | null> {
 
 /**
  * Get environment variables to pass to the Claude process.
- * Includes ANTHROPIC_API_KEY and any CLAUDE_ENV_* prefixed variables.
+ * Includes Anthropic API settings and any CLAUDE_ENV_* prefixed variables.
+ *
+ * Supported environment variables:
+ * - ANTHROPIC_API_KEY: API key (can be empty for local models)
+ * - ANTHROPIC_BASE_URL: Custom API endpoint (e.g., http://localhost:11434 for Ollama)
+ * - ANTHROPIC_AUTH_TOKEN: Auth token (e.g., "ollama" for local models)
+ * - CLAUDE_ENV_*: Any variable with this prefix is passed with prefix stripped
  */
 export function getClaudeEnv(): Record<string, string | undefined> {
   const env: Record<string, string | undefined> = {};
 
-  // Pass through ANTHROPIC_API_KEY if set
-  if (process.env.ANTHROPIC_API_KEY) {
+  // Pass through Anthropic API settings (for local model support like Ollama)
+  // Note: ANTHROPIC_API_KEY can be empty string for local models
+  if (process.env.ANTHROPIC_API_KEY !== undefined) {
     env['ANTHROPIC_API_KEY'] = process.env.ANTHROPIC_API_KEY;
+  }
+  if (process.env.ANTHROPIC_BASE_URL) {
+    env['ANTHROPIC_BASE_URL'] = process.env.ANTHROPIC_BASE_URL;
+  }
+  if (process.env.ANTHROPIC_AUTH_TOKEN) {
+    env['ANTHROPIC_AUTH_TOKEN'] = process.env.ANTHROPIC_AUTH_TOKEN;
   }
 
   // Pass through any CLAUDE_ENV_* variables (stripping the prefix)
