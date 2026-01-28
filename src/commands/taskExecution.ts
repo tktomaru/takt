@@ -88,18 +88,20 @@ export async function executeAndCompleteTask(
       }
     }
 
-    taskRunner.completeTask({
+    const taskResult = {
       task,
       success: taskSuccess,
       response: taskSuccess ? 'Task completed successfully' : 'Task failed',
       executionLog,
       startedAt,
       completedAt,
-    });
+    };
 
     if (taskSuccess) {
+      taskRunner.completeTask(taskResult);
       success(`Task "${task.name}" completed`);
     } else {
+      taskRunner.failTask(taskResult);
       error(`Task "${task.name}" failed`);
     }
 
@@ -107,7 +109,7 @@ export async function executeAndCompleteTask(
   } catch (err) {
     const completedAt = new Date().toISOString();
 
-    taskRunner.completeTask({
+    taskRunner.failTask({
       task,
       success: false,
       response: getErrorMessage(err),
