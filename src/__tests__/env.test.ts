@@ -100,33 +100,39 @@ describe('getClaudeEnv', () => {
     process.env = { ...originalEnv };
   });
 
-  it('returns empty object when no relevant env vars are set', () => {
+  it('returns undefined when no relevant env vars are set', () => {
     const result = getClaudeEnv();
-    expect(result).toEqual({});
+    expect(result).toBeUndefined();
   });
 
-  it('includes ANTHROPIC_API_KEY when set', () => {
+  it('includes ANTHROPIC_API_KEY when set (preserves process.env)', () => {
     process.env.ANTHROPIC_API_KEY = 'sk-ant-test-key';
     const result = getClaudeEnv();
-    expect(result).toEqual({ ANTHROPIC_API_KEY: 'sk-ant-test-key' });
+    expect(result).toBeDefined();
+    expect(result?.ANTHROPIC_API_KEY).toBe('sk-ant-test-key');
+    // Should preserve PATH from process.env
+    expect(result?.PATH).toBe(process.env.PATH);
   });
 
   it('includes empty ANTHROPIC_API_KEY for local models', () => {
     process.env.ANTHROPIC_API_KEY = '';
     const result = getClaudeEnv();
-    expect(result).toEqual({ ANTHROPIC_API_KEY: '' });
+    expect(result).toBeDefined();
+    expect(result?.ANTHROPIC_API_KEY).toBe('');
   });
 
   it('includes ANTHROPIC_BASE_URL when set', () => {
     process.env.ANTHROPIC_BASE_URL = 'http://localhost:11434';
     const result = getClaudeEnv();
-    expect(result).toEqual({ ANTHROPIC_BASE_URL: 'http://localhost:11434' });
+    expect(result).toBeDefined();
+    expect(result?.ANTHROPIC_BASE_URL).toBe('http://localhost:11434');
   });
 
   it('includes ANTHROPIC_AUTH_TOKEN when set', () => {
     process.env.ANTHROPIC_AUTH_TOKEN = 'ollama';
     const result = getClaudeEnv();
-    expect(result).toEqual({ ANTHROPIC_AUTH_TOKEN: 'ollama' });
+    expect(result).toBeDefined();
+    expect(result?.ANTHROPIC_AUTH_TOKEN).toBe('ollama');
   });
 
   it('includes all Anthropic settings for Ollama setup', () => {
@@ -134,36 +140,34 @@ describe('getClaudeEnv', () => {
     process.env.ANTHROPIC_BASE_URL = 'http://localhost:11434';
     process.env.ANTHROPIC_AUTH_TOKEN = 'ollama';
     const result = getClaudeEnv();
-    expect(result).toEqual({
-      ANTHROPIC_API_KEY: '',
-      ANTHROPIC_BASE_URL: 'http://localhost:11434',
-      ANTHROPIC_AUTH_TOKEN: 'ollama',
-    });
+    expect(result).toBeDefined();
+    expect(result?.ANTHROPIC_API_KEY).toBe('');
+    expect(result?.ANTHROPIC_BASE_URL).toBe('http://localhost:11434');
+    expect(result?.ANTHROPIC_AUTH_TOKEN).toBe('ollama');
   });
 
   it('strips CLAUDE_ENV_ prefix and includes the value', () => {
     process.env.CLAUDE_ENV_MY_CUSTOM_VAR = 'custom-value';
     const result = getClaudeEnv();
-    expect(result).toEqual({ MY_CUSTOM_VAR: 'custom-value' });
+    expect(result).toBeDefined();
+    expect(result?.MY_CUSTOM_VAR).toBe('custom-value');
   });
 
   it('includes multiple CLAUDE_ENV_ prefixed vars', () => {
     process.env.CLAUDE_ENV_VAR1 = 'value1';
     process.env.CLAUDE_ENV_VAR2 = 'value2';
     const result = getClaudeEnv();
-    expect(result).toEqual({
-      VAR1: 'value1',
-      VAR2: 'value2',
-    });
+    expect(result).toBeDefined();
+    expect(result?.VAR1).toBe('value1');
+    expect(result?.VAR2).toBe('value2');
   });
 
   it('combines ANTHROPIC_API_KEY with CLAUDE_ENV_ vars', () => {
     process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
     process.env.CLAUDE_ENV_CUSTOM = 'custom';
     const result = getClaudeEnv();
-    expect(result).toEqual({
-      ANTHROPIC_API_KEY: 'sk-ant-test',
-      CUSTOM: 'custom',
-    });
+    expect(result).toBeDefined();
+    expect(result?.ANTHROPIC_API_KEY).toBe('sk-ant-test');
+    expect(result?.CUSTOM).toBe('custom');
   });
 });

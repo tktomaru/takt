@@ -55,28 +55,34 @@ export function getClaudeExtraArgs(): Record<string, string | null> {
 
 /**
  * Get environment variables to pass to the Claude process.
- * Includes Anthropic API settings and any CLAUDE_ENV_* prefixed variables.
+ * Starts with process.env and overlays Anthropic API settings.
  *
  * Supported environment variables:
  * - ANTHROPIC_API_KEY: API key (can be empty for local models)
  * - ANTHROPIC_BASE_URL: Custom API endpoint (e.g., http://localhost:11434 for Ollama)
  * - ANTHROPIC_AUTH_TOKEN: Auth token (e.g., "ollama" for local models)
  * - CLAUDE_ENV_*: Any variable with this prefix is passed with prefix stripped
+ *
+ * Returns undefined if no custom settings are needed (SDK will use process.env by default).
  */
-export function getClaudeEnv(): Record<string, string | undefined> {
-  const env: Record<string, string | undefined> = {};
+export function getClaudeEnv(): Record<string, string | undefined> | undefined {
+  // Check if any custom env vars are set
+  const hasAnthropicSettings =
+    process.env.ANTHROPIC_API_KEY !== undefined ||
+    process.env.ANTHROPIC_BASE_URL ||
+    process.env.ANTHROPIC_AUTH_TOKEN;
 
-  // Pass through Anthropic API settings (for local model support like Ollama)
-  // Note: ANTHROPIC_API_KEY can be empty string for local models
-  if (process.env.ANTHROPIC_API_KEY !== undefined) {
-    env['ANTHROPIC_API_KEY'] = process.env.ANTHROPIC_API_KEY;
+  const hasClaudeEnvVars = Object.keys(process.env).some((key) =>
+    key.startsWith('CLAUDE_ENV_')
+  );
+
+  // If no custom settings, return undefined to let SDK use process.env directly
+  if (!hasAnthropicSettings && !hasClaudeEnvVars) {
+    return undefined;
   }
-  if (process.env.ANTHROPIC_BASE_URL) {
-    env['ANTHROPIC_BASE_URL'] = process.env.ANTHROPIC_BASE_URL;
-  }
-  if (process.env.ANTHROPIC_AUTH_TOKEN) {
-    env['ANTHROPIC_AUTH_TOKEN'] = process.env.ANTHROPIC_AUTH_TOKEN;
-  }
+
+  // Start with a copy of process.env to preserve PATH and other essential vars
+  const env: Record<string, string | undefined> = { ...process.env };
 
   // Pass through any CLAUDE_ENV_* variables (stripping the prefix)
   for (const [key, value] of Object.entries(process.env)) {
