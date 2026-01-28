@@ -89,6 +89,12 @@ export interface WorkflowStep {
    * - 'stay': Stay on current step (may cause loops, use with caution)
    */
   onNoStatus?: OnNoStatusBehavior;
+  /** Enable parallel execution for this step */
+  parallel: boolean;
+  /** Maximum number of concurrent workers for parallel execution */
+  maxWorkers: number;
+  /** Directory containing task files for parallel execution (relative to project root) */
+  taskSource?: string;
 }
 
 /** Loop detection configuration */
@@ -167,4 +173,30 @@ export interface ProjectConfig {
   workflow?: string;
   agents?: CustomAgentConfig[];
   provider?: 'claude' | 'codex' | 'mock';
+}
+
+/** Result of a single parallel job execution */
+export interface ParallelJobResult {
+  /** Name of the task (filename without extension) */
+  taskName: string;
+  /** Full path to the task file */
+  taskFile: string;
+  /** Agent response from execution */
+  response: AgentResponse;
+  /** Whether the job completed successfully (status is done/approved) */
+  success: boolean;
+}
+
+/** Aggregated result of parallel step execution */
+export interface ParallelStepResult {
+  /** All job results */
+  jobs: ParallelJobResult[];
+  /** Total number of jobs executed */
+  totalJobs: number;
+  /** Number of successful jobs */
+  successCount: number;
+  /** Number of failed jobs */
+  failedCount: number;
+  /** Whether all jobs succeeded */
+  allSucceeded: boolean;
 }

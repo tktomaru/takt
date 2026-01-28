@@ -81,6 +81,12 @@ export const WorkflowStepRawSchema = z.object({
       next_step: z.string().min(1),
     })
   ).optional().default([]),
+  /** Enable parallel execution for this step */
+  parallel: z.boolean().optional().default(false),
+  /** Maximum number of concurrent workers for parallel execution */
+  max_workers: z.number().int().positive().optional().default(4),
+  /** Directory containing task files for parallel execution (relative to project root) */
+  task_source: z.string().optional(),
 });
 
 /** Workflow configuration schema - raw YAML format */

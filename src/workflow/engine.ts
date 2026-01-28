@@ -12,6 +12,11 @@ import type {
   AgentResponse,
 } from '../models/types.js';
 import { runAgent, type RunAgentOptions } from '../agents/runner.js';
+import {
+  executeParallelStep,
+  aggregateParallelResult,
+  type ParallelExecutorOptions,
+} from './parallel-executor.js';
 import { COMPLETE_STEP, ABORT_STEP, ERROR_MESSAGES } from './constants.js';
 import type { WorkflowEngineOptions } from './types.js';
 import { determineNextStep } from './transitions.js';
@@ -155,6 +160,16 @@ export class WorkflowEngine extends EventEmitter {
 
   /** Run a single step */
   private async runStep(step: WorkflowStep): Promise<AgentResponse> {
+    // Check if this is a parallel execution step
+    if (step.parallel) {
+      return this.runParallelStep(step);
+    }
+
+    return this.runSequentialStep(step);
+  }
+
+  /** Run a step in sequential mode (single agent execution) */
+  private async runSequentialStep(step: WorkflowStep): Promise<AgentResponse> {
     // Increment step iteration counter before building instruction
     const stepIteration = incrementStepIteration(this.state, step.name);
     const instruction = this.buildInstruction(step, stepIteration);
@@ -192,6 +207,44 @@ export class WorkflowEngine extends EventEmitter {
         this.options.onSessionUpdate(step.agent, response.sessionId);
       }
     }
+
+    this.state.stepOutputs.set(step.name, response);
+    return response;
+  }
+
+  /** Run a step in parallel mode (multiple tasks concurrently) */
+  private async runParallelStep(step: WorkflowStep): Promise<AgentResponse> {
+    const stepIteration = incrementStepIteration(this.state, step.name);
+    const baseInstruction = this.buildInstruction(step, stepIteration);
+
+    log.debug('Running parallel step', {
+      step: step.name,
+      agent: step.agent,
+      maxWorkers: step.maxWorkers,
+      taskSource: step.taskSource,
+    });
+
+    const parallelOptions: ParallelExecutorOptions = {
+      cwd: this.cwd,
+      projectCwd: this.projectCwd,
+      baseInstruction,
+      agentOptions: {
+        agentPath: step.agentPath,
+        allowedTools: step.allowedTools,
+        statusRulesPrompt: step.statusRulesPrompt,
+        provider: step.provider,
+        model: step.model,
+        permissionMode: step.permissionMode,
+        onStream: this.options.onStream,
+        onPermissionRequest: this.options.onPermissionRequest,
+        onAskUserQuestion: this.options.onAskUserQuestion,
+        bypassPermissions: this.options.bypassPermissions,
+      },
+      emitter: this,
+    };
+
+    const result = await executeParallelStep(step, parallelOptions);
+    const response = aggregateParallelResult(step, result);
 
     this.state.stepOutputs.set(step.name, response);
     return response;

@@ -5,7 +5,7 @@
  * used by the workflow execution engine.
  */
 
-import type { WorkflowStep, AgentResponse, WorkflowState, Language } from '../models/types.js';
+import type { WorkflowStep, AgentResponse, WorkflowState, Language, ParallelStepResult } from '../models/types.js';
 import type { StreamCallback } from '../agents/runner.js';
 import type { PermissionHandler, AskUserQuestionHandler } from '../claude/process.js';
 
@@ -19,6 +19,12 @@ export interface WorkflowEvents {
   'workflow:abort': (state: WorkflowState, reason: string) => void;
   'iteration:limit': (iteration: number, maxIterations: number) => void;
   'step:loop_detected': (step: WorkflowStep, consecutiveCount: number) => void;
+  /** Emitted when parallel execution starts */
+  'parallel:start': (step: WorkflowStep, totalJobs: number, maxWorkers: number) => void;
+  /** Emitted when a parallel job completes */
+  'parallel:job_complete': (step: WorkflowStep, taskName: string, success: boolean) => void;
+  /** Emitted when all parallel jobs complete */
+  'parallel:complete': (step: WorkflowStep, result: ParallelStepResult) => void;
 }
 
 /** User input request for blocked state */

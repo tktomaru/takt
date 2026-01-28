@@ -78,6 +78,9 @@ function normalizeWorkflowConfig(raw: unknown, workflowDir: string): WorkflowCon
     })),
     passPreviousResponse: step.pass_previous_response,
     onNoStatus: step.on_no_status,
+    parallel: step.parallel,
+    maxWorkers: step.max_workers,
+    taskSource: step.task_source,
   }));
 
   return {

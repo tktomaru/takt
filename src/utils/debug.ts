@@ -142,6 +142,11 @@ export function infoLog(component: string, message: string, data?: unknown): voi
   writeLog('INFO', component, message, data);
 }
 
+/** Write a warn log entry */
+export function warnLog(component: string, message: string, data?: unknown): void {
+  writeLog('WARN', component, message, data);
+}
+
 /** Write an error log entry */
 export function errorLog(component: string, message: string, data?: unknown): void {
   writeLog('ERROR', component, message, data);
@@ -162,6 +167,7 @@ export function createLogger(component: string) {
   return {
     debug: (message: string, data?: unknown) => debugLog(component, message, data),
     info: (message: string, data?: unknown) => infoLog(component, message, data),
+    warn: (message: string, data?: unknown) => warnLog(component, message, data),
     error: (message: string, data?: unknown) => errorLog(component, message, data),
     enter: (funcName: string, args?: Record<string, unknown>) => traceEnter(component, funcName, args),
     exit: (funcName: string, result?: unknown) => traceExit(component, funcName, result),
