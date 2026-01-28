@@ -1,10 +1,17 @@
 /**
  * Workflow execution logic
+ *
+ * Executes workflows with minimal console output.
+ * Agent output is written to log files only (use /open to monitor).
+ * User input is always accepted and interrupts the current agent.
  */
 
+import * as readline from 'node:readline';
 import { WorkflowEngine } from '../workflow/engine.js';
 import type { WorkflowConfig, Language } from '../models/types.js';
-import type { IterationLimitRequest } from '../workflow/types.js';
+import type { IterationLimitRequest, UserInputRequest } from '../workflow/types.js';
+import { interruptAllQueries } from '../claude/query-manager.js';
+import type { StreamEvent } from '../claude/types.js';
 import {
   loadAgentSessions,
   updateAgentSession,
@@ -18,7 +25,6 @@ import {
   error,
   success,
   status,
-  StreamDisplay,
 } from '../utils/ui.js';
 import {
   generateSessionId,
@@ -72,6 +78,8 @@ export interface WorkflowExecutionOptions {
   projectCwd?: string;
   /** Language for instruction metadata */
   language?: Language;
+  /** Enable verbose console output (default: false, logs go to files only) */
+  verbose?: boolean;
 }
 
 /**
@@ -85,15 +93,18 @@ export async function executeWorkflow(
 ): Promise<WorkflowExecutionResult> {
   const {
     headerPrefix = 'Running Workflow:',
+    verbose = false,
   } = options;
 
   // projectCwd is where .takt/ lives (project root, not worktree)
   const projectCwd = options.projectCwd ?? cwd;
 
-  // Always continue from previous sessions (use /clear to reset)
   log.debug('Continuing session (use /clear to reset)');
 
   header(`${headerPrefix} ${workflowConfig.name}`);
+  info('Use /open in another terminal to monitor agent logs');
+  info('Type your input anytime to interrupt and provide feedback');
+  console.log();
 
   const workflowSessionId = generateSessionId();
   const sessionLog = createSessionLog(task, projectCwd, workflowConfig.name);
@@ -102,17 +113,47 @@ export async function executeWorkflow(
   saveSessionLog(sessionLog, workflowSessionId, projectCwd);
   updateLatestPointer(sessionLog, workflowSessionId, projectCwd, { copyToPrevious: true });
 
-  // Track current display for streaming
-  const displayRef: { current: StreamDisplay | null } = { current: null };
-
   // Track current agent for logging
   const currentAgentRef: { name: string | null } = { name: null };
 
-  // Create stream handler that delegates to current display and writes to agent log
-  const streamHandler = (
-    event: Parameters<ReturnType<StreamDisplay['createHandler']>>[0]
-  ): void => {
-    // Write to agent log file
+  // User input queue for interrupts
+  const userInputQueue: string[] = [];
+  let inputListenerActive = true;
+
+  // Setup readline for background input monitoring
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    terminal: false,
+  });
+
+  // Show input prompt
+  const showPrompt = (): void => {
+    process.stdout.write('> ');
+  };
+
+  // Handle user input - interrupt current agent and queue input
+  rl.on('line', (input: string) => {
+    if (!inputListenerActive) return;
+
+    const trimmedInput = input.trim();
+    if (trimmedInput) {
+      userInputQueue.push(trimmedInput);
+      log.info('User input received, interrupting current agent', { input: trimmedInput });
+
+      // Interrupt all running queries to inject user input
+      interruptAllQueries();
+
+      // Write to current agent's log
+      if (currentAgentRef.name) {
+        writeAgentLog(currentAgentRef.name, `\n[USER_INPUT] ${trimmedInput}\n`);
+      }
+    }
+  });
+
+  // Create stream handler that writes to agent log file only (no console output)
+  const streamHandler = (event: StreamEvent): void => {
+    // Write to agent log file only
     if (currentAgentRef.name) {
       const agentName = currentAgentRef.name;
       switch (event.type) {
@@ -133,19 +174,19 @@ export async function executeWorkflow(
       }
     }
 
-    if (!displayRef.current) return;
-    if (event.type === 'result') return;
-    displayRef.current.createHandler()(event);
+    // Verbose mode: also print to console (for debugging)
+    if (verbose && event.type === 'text') {
+      process.stdout.write(event.data.text);
+    }
   };
 
-  // Load saved agent sessions for continuity (from project root or worktree-specific storage)
+  // Load saved agent sessions for continuity
   const isWorktree = cwd !== projectCwd;
   const savedSessions = isWorktree
     ? loadWorktreeSessions(projectCwd, cwd)
     : loadAgentSessions(projectCwd);
 
-  // Session update handler - persist session IDs when they change
-  // Worktree sessions are stored separately per worktree path
+  // Session update handler
   const sessionUpdateHandler = isWorktree
     ? (agentName: string, agentSessionId: string): void => {
         updateWorktreeSession(projectCwd, cwd, agentName, agentSessionId);
@@ -154,14 +195,30 @@ export async function executeWorkflow(
         updateAgentSession(projectCwd, agentName, agentSessionId);
       };
 
+  // User input handler for BLOCKED status
+  const userInputHandler = async (
+    request: UserInputRequest
+  ): Promise<string | null> => {
+    // Check if we have queued input from interrupt
+    if (userInputQueue.length > 0) {
+      const queuedInput = userInputQueue.shift()!;
+      info(`Using queued input: ${queuedInput.slice(0, 50)}...`);
+      return queuedInput;
+    }
+
+    console.log();
+    warn(`Agent is blocked: ${request.step.name}`);
+    if (request.prompt) {
+      info(request.prompt);
+    }
+
+    const userInput = await promptInput('Your response (empty to abort)');
+    return userInput || null;
+  };
+
   const iterationLimitHandler = async (
     request: IterationLimitRequest
   ): Promise<number | null> => {
-    if (displayRef.current) {
-      displayRef.current.flush();
-      displayRef.current = null;
-    }
-
     console.log();
     warn(
       `最大イテレーションに到達しました (${request.currentIteration}/${request.maxIterations})`
@@ -202,6 +259,7 @@ export async function executeWorkflow(
     initialSessions: savedSessions,
     onSessionUpdate: sessionUpdateHandler,
     onIterationLimit: iterationLimitHandler,
+    onUserInput: userInputHandler,
     projectCwd,
     language: options.language,
   });
@@ -210,8 +268,9 @@ export async function executeWorkflow(
 
   engine.on('step:start', (step, iteration) => {
     log.debug('Step starting', { step: step.name, agent: step.agentDisplayName, iteration });
-    info(`[${iteration}/${workflowConfig.maxIterations}] ${step.name} (${step.agentDisplayName})`);
-    displayRef.current = new StreamDisplay(step.agentDisplayName);
+
+    // Minimal console output: just step info
+    console.log(`[${iteration}/${workflowConfig.maxIterations}] ${step.name} (${step.agentDisplayName})`);
 
     // Initialize agent log and track current agent
     currentAgentRef.name = step.agentDisplayName;
@@ -219,6 +278,13 @@ export async function executeWorkflow(
       initAgentLog(step.agentDisplayName);
     }
     logAgentStepStart(step.agentDisplayName, step.name, iteration);
+
+    // Inject any queued user input
+    while (userInputQueue.length > 0) {
+      const queuedInput = userInputQueue.shift()!;
+      engine.addUserInput(queuedInput);
+      info(`Injected user input: ${queuedInput.slice(0, 50)}...`);
+    }
   });
 
   engine.on('step:complete', (step, response) => {
@@ -236,29 +302,25 @@ export async function executeWorkflow(
     }
     currentAgentRef.name = null;
 
-    if (displayRef.current) {
-      displayRef.current.flush();
-      displayRef.current = null;
-    }
-    console.log();
+    // Minimal console output: just status
     status('Status', response.status);
     if (response.error) {
       error(`Error: ${response.error}`);
     }
-    if (response.sessionId) {
-      status('Session', response.sessionId);
-    }
+
     addToSessionLog(sessionLog, step.name, response);
 
     // Incremental save after each step
     saveSessionLog(sessionLog, workflowSessionId, projectCwd);
     updateLatestPointer(sessionLog, workflowSessionId, projectCwd);
+
+    // Show prompt for next input
+    showPrompt();
   });
 
   engine.on('workflow:complete', (state) => {
     log.info('Workflow completed successfully', { iterations: state.iteration });
     finalizeSessionLog(sessionLog, 'completed');
-    // Save log to project root so user can find it easily
     const logPath = saveSessionLog(sessionLog, workflowSessionId, projectCwd);
     updateLatestPointer(sessionLog, workflowSessionId, projectCwd);
 
@@ -267,6 +329,7 @@ export async function executeWorkflow(
       : '';
     const elapsedDisplay = elapsed ? `, ${elapsed}` : '';
 
+    console.log();
     success(`Workflow completed (${state.iteration} iterations${elapsedDisplay})`);
     info(`Session log: ${logPath}`);
     notifySuccess('TAKT', `ワークフロー完了 (${state.iteration} iterations)`);
@@ -274,13 +337,8 @@ export async function executeWorkflow(
 
   engine.on('workflow:abort', (state, reason) => {
     log.error('Workflow aborted', { reason, iterations: state.iteration });
-    if (displayRef.current) {
-      displayRef.current.flush();
-      displayRef.current = null;
-    }
     abortReason = reason;
     finalizeSessionLog(sessionLog, 'aborted');
-    // Save log to project root so user can find it easily
     const logPath = saveSessionLog(sessionLog, workflowSessionId, projectCwd);
     updateLatestPointer(sessionLog, workflowSessionId, projectCwd);
 
@@ -289,12 +347,20 @@ export async function executeWorkflow(
       : '';
     const elapsedDisplay = elapsed ? ` (${elapsed})` : '';
 
+    console.log();
     error(`Workflow aborted after ${state.iteration} iterations${elapsedDisplay}: ${reason}`);
     info(`Session log: ${logPath}`);
     notifyError('TAKT', `中断: ${reason}`);
   });
 
+  // Show initial prompt
+  showPrompt();
+
   const finalState = await engine.run();
+
+  // Cleanup readline
+  inputListenerActive = false;
+  rl.close();
 
   return {
     success: finalState.status === 'completed',
