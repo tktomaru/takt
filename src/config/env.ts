@@ -12,11 +12,12 @@ import { join } from 'node:path';
 /**
  * Load .env file from the specified directory.
  * Does nothing if the file doesn't exist.
+ * Note: override=true ensures .env values take precedence over shell environment.
  */
 export function loadEnv(projectDir: string): void {
   const envPath = join(projectDir, '.env');
   if (existsSync(envPath)) {
-    config({ path: envPath });
+    config({ path: envPath, override: true });
   }
 }
 

@@ -80,9 +80,14 @@ function buildSdkOptions(options: ExecuteOptions): Options {
     permissionMode = 'acceptEdits';
   }
 
+  // If extraArgs.model is set (from .env), don't set sdkOptions.model
+  // to let extraArgs take precedence
+  const modelFromExtraArgs = options.extraArgs?.['model'];
+  const effectiveModel = modelFromExtraArgs ? undefined : options.model;
+
   const sdkOptions: Options = {
     cwd: options.cwd,
-    model: options.model,
+    model: effectiveModel,
     maxTurns: options.maxTurns,
     allowedTools: options.allowedTools,
     agents: options.agents,
@@ -122,6 +127,8 @@ export async function executeClaudeQuery(
     model: options.model,
     hasSystemPrompt: !!options.systemPrompt,
     allowedTools: options.allowedTools,
+    env: options.env,
+    extraArgs: options.extraArgs,
   });
 
   const sdkOptions = buildSdkOptions(options);
